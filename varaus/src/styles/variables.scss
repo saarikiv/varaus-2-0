@@ -1,0 +1,44 @@
+$body-color: #f8f9fa;
+$container-color: #fff;
+$border: #ddd;
+$shadow-color: #000;
+$text-light: #fafafa;
+$text-dark: #454552;
+$text-fade: #787885;
+$lightergray: #f0f0f1;
+$lightgray: #f6f7f8;
+$lightblue: #a5dff9;
+$lighterblue: #63b6e8;
+$blue: #4ea1e8;
+$darkblue: #398ca9;
+$lightred: #fd5f86;
+$red: #e85a71;
+$darkred: #d3455c;
+$lightgreen: #6ad593;
+$green: #55c07e;
+$darkgreen: #40ab69;
+$white: #fefeff;
+$yellow: #ffffdb;
+$orange: #ff9955;
+
+$hover-btn: $text-fade;
+$active-btn: $text-dark;
+$hover-item: $lighterblue;
+$active-item: $darkblue;
+$link: $blue;
+$link-hover: $darkblue;
+$link-active: $lighterblue;
+$lightnav: $white;
+$nav: $lightgray;
+
+$container-radius: 2px;
+$btn-radius: 2px;
+$logo-radius: 1px;
+
+$mobile-size: 719px;
+$desktop-size: 720px;
+
+$shadow: 0 2px 5px $shadow-color;
+
+$indWidthPc: 7px;
+$indWidthMobile: 3vw;

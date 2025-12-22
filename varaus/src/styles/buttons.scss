@@ -1,0 +1,286 @@
+@import 'variables.scss';
+
+//////////////////////////////////////////////////////////////
+// MOBILE
+//////////////////////////////////////////////////////////////
+
+@media screen and (max-width: $mobile-size) {
+
+
+  .btn-small {
+    margin: 0 2px;
+    padding: 2.2vw 1.5vw;
+  }
+
+  .btn-right {
+    float: right;;
+  }
+
+  .btn-left {
+    float: left;;
+  }
+
+  .text-link {
+    margin: 0;
+    padding: 1vw 1.2vw;
+  }
+  .back-btn {
+    display: inline-block;
+    margin-bottom: 1.5vw;
+  }
+
+  .expand-btn {
+    margin: 0 0 1vw;
+    padding: 1vw 1.2vw;
+  }
+
+  .mini-link {
+    margin: 3vw 0 1vw;
+  }
+
+  .mobile-full {
+    width: 100%;
+    text-align: center;
+  }
+
+  .nav-btn {
+    vertical-align: middle;
+    padding: 4vw;
+    box-sizing: border-box;
+    height: 14vw;
+    width: 14vw;
+    &:active {
+      background: $active-btn;
+    }
+  }
+
+  .social-btn {
+    img {
+      width: 10vw;
+    }
+    margin-right: 2vw;
+  }
+
+  button.search-btn {
+    margin-left: 2vw;
+    margin-bottom: 1vw;
+  }
+}
+
+//////////////////////////////////////////////////////////////
+// DESKTOP
+//////////////////////////////////////////////////////////////
+
+@media screen and (min-width: $desktop-size) {
+
+  .btn-small {
+    margin: 0 2px;
+    padding: 7px 11px;
+  }
+  
+  .btn-right {
+    float: right;;
+  }
+
+  .btn-left {
+    float: left;;
+  }
+
+  .text-link {
+    margin: 0;
+    padding: 7px 11px;
+  }
+  .back-btn {
+    display: inline-block;
+    margin-bottom: 10px;
+  }
+
+  .expand-btn {
+    margin: 0 0 5px;
+    padding: 7px 11px;
+  }
+
+  .mini-link {
+    margin: 10px auto 0;
+  }
+
+  .mobile-full {
+    width: 100%;
+    text-align: center;
+  }
+
+  .social-btn {
+    img {
+      width: 32px;
+    }
+    margin-right: 5px;
+  }
+
+  .search-btn {
+    margin-bottom: 10px;
+    margin-left: 10px;
+  }
+}
+
+
+//////////////////////////////////////////////////////////////
+// ALL
+//////////////////////////////////////////////////////////////
+
+.btn-small {
+  margin: 0;
+  text-decoration: none;
+  color: $text-light;
+  border-radius: $btn-radius;
+  box-sizing: border-box;
+  text-transform: uppercase;
+  transition: background 0.1s, color 0.1s;
+}
+.btn-blue {
+  background: $blue; /* For browsers that do not support gradients */
+  background: -webkit-linear-gradient($lighterblue, $blue); /* For Safari 5.1 to 6.0 */
+  background: -o-linear-gradient($lighterblue, $blue); /* For Opera 11.1 to 12.0 */
+  background: -moz-linear-gradient($lighterblue, $blue); /* For Firefox 3.6 to 15 */
+  background: linear-gradient($lighterblue, $blue); /* Standard syntax */
+  transition: background 0.1s, color 0.1s;
+  border: 1px solid $blue;
+  &:hover {
+    background: $darkblue; /* For browsers that do not support gradients */
+    background: -webkit-linear-gradient($blue, $darkblue); /* For Safari 5.1 to 6.0 */
+    background: -o-linear-gradient($blue, $darkblue); /* For Opera 11.1 to 12.0 */
+    background: -moz-linear-gradient($blue, $darkblue); /* For Firefox 3.6 to 15 */
+    background: linear-gradient($blue, $darkblue); /* Standard syntax */
+  }
+  &:active {
+    background: $active-btn;
+  }
+}
+.btn-green {
+  background: $green;
+  background: -webkit-linear-gradient($lightgreen, $green); /* For Safari 5.1 to 6.0 */
+  background: -o-linear-gradient($lightgreen, $green); /* For Opera 11.1 to 12.0 */
+  background: -moz-linear-gradient($lightgreen, $green); /* For Firefox 3.6 to 15 */
+  background: linear-gradient($lightgreen, $green); /* Standard syntax */
+  border: 1px solid $green;
+  transition: background 0.1s, color 0.1s;
+  &:hover {
+    background: $darkgreen;
+    background: -webkit-linear-gradient($green, $darkgreen); /* For Safari 5.1 to 6.0 */
+    background: -o-linear-gradient($green, $darkgreen); /* For Opera 11.1 to 12.0 */
+    background: -moz-linear-gradient($green, $darkgreen); /* For Firefox 3.6 to 15 */
+    background: linear-gradient($green, $darkgreen); /* Standard syntax */
+  }
+  &:active {
+    background: $active-btn;
+  }
+}
+.btn-red {
+  background: $red;
+  background: -webkit-linear-gradient($lightred, $red); /* For Safari 5.1 to 6.0 */
+  background: -o-linear-gradient($lightred, $red); /* For Opera 11.1 to 12.0 */
+  background: -moz-linear-gradient($lightred, $red); /* For Firefox 3.6 to 15 */
+  background: linear-gradient($lightred, $red); /* Standard syntax */
+  border: 1px solid $red;
+  transition: background 0.1s, color 0.1s;
+  &:hover {
+    background: $darkred;
+    background: -webkit-linear-gradient($red, $darkred); /* For Safari 5.1 to 6.0 */
+    background: -o-linear-gradient($red, $darkred); /* For Opera 11.1 to 12.0 */
+    background: -moz-linear-gradient($red, $darkred); /* For Firefox 3.6 to 15 */
+    background: linear-gradient($red, $darkred); /* Standard syntax */
+  }
+  &:active {
+    background: $active-btn;
+  }
+}
+.btn-white {
+  background: $text-light;
+  background: -webkit-linear-gradient($white, $text-light); /* For Safari 5.1 to 6.0 */
+  background: -o-linear-gradient($white, $text-light); /* For Opera 11.1 to 12.0 */
+  background: -moz-linear-gradient($white, $text-light); /* For Firefox 3.6 to 15 */
+  background: linear-gradient($white, $text-light); /* Standard syntax */
+  color: $blue;
+  transition: background 0.1s, color 0.1s;
+  border: 1px solid $border;
+  &:hover {
+    background: $lightergray;
+  }
+  &:active {
+    background: $active-btn;
+    color: $text-light;
+  }
+}
+
+.text-link {
+  text-decoration: none;
+  color: $link;
+  text-transform: uppercase;
+  transition: color 0.1s, background-color 0.1s;
+  border-radius: $btn-radius;
+  &:hover {
+    color: $link-hover;
+    background-color: $border;
+  }
+  &:active {
+    color: $text-fade;
+  }
+}
+
+a.text-link-white {
+  background-color: $container-color;
+  color: $blue;
+}
+
+.back-btn {
+  text-decoration: none;
+}
+
+.expand-btn {
+  color: $link;
+  border: none;
+  text-decoration: none;
+  background: transparent;
+  border-radius: $btn-radius;
+  text-transform: uppercase;
+  transition: color 0.1s, background-color 0.1s;
+  display: block;
+  &:hover {
+    color: $link-hover;
+    background-color: $border;
+  }
+  &:active {
+    color: $text-fade;
+  }
+}
+
+.btn-link {
+  display: inline-block;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+.mini-link {  
+  padding: 0;
+  color: $blue;
+  text-align: center;
+  display: block;
+  text-decoration: none;
+  &:hover {
+    color: $darkblue;
+    cursor: pointer;
+  }
+}
+
+.social-btn {
+  box-sizing: border-box;
+  img {
+    height: auto;
+    border-radius: $btn-radius;
+    box-sizing: border-box;
+  }
+}
+
+.search-btn {
+  display: inline-block;
+  vertical-align: bottom;
+}

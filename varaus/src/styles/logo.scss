@@ -1,0 +1,80 @@
+@import 'variables.scss';
+
+/////////////////////////////////////////////////////
+// MOBILE
+/////////////////////////////////////////////////////
+
+@media screen and (max-width: $mobile-size) {
+  .logo-container {
+    margin: 0 auto 3vw;
+    img {
+      width: 80%;
+      height: auto;
+    }    
+  }
+
+  .ticket-logo {
+    margin: 4vw 2vw 4vw 0;
+    width: 16vw;
+    img {
+      padding: 0 0 3vw;
+    }
+    .ticket-amnt {
+      padding: 2vw 0 0;
+    }
+  }
+}
+
+/////////////////////////////////////////////////////
+// DESKTOP
+/////////////////////////////////////////////////////
+
+@media screen and (min-width: $desktop-size) {
+  .logo-container {
+    margin: 0 auto 10px;
+    img {
+      width: 250px;
+      height: auto;
+    }
+  }
+
+  .ticket-logo {
+    margin: 20px 12px 20px 0;
+    width: 50px;
+    img {
+      padding: 7px 0;
+    }
+    .ticket-amnt {
+      padding: 7px 0;
+    }
+  }
+}
+
+/////////////////////////////////////////////////////
+// ALL
+/////////////////////////////////////////////////////
+
+  .logo-container {
+    box-sizing: border-box;    
+    img {
+      box-sizing: border-box;
+      border-radius: $logo-radius;
+    }
+  }
+
+  .ticket-logo {
+    display: inline-block;
+    box-sizing: border-box;
+    img {
+      display: block;
+      margin: 0 auto;
+      border-bottom: 1px solid $border;
+    }
+    .ticket-amnt {
+      margin: 0;      
+      display: block;
+      text-align: center;
+      border-bottom-left-radius: $container-radius;
+      border-bottom-right-radius: $container-radius; 
+    }
+  }

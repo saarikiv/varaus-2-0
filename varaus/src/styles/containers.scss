@@ -1,0 +1,462 @@
+@import 'variables.scss';
+
+/////////////////////////////////////////////////////
+// MOBILE
+/////////////////////////////////////////////////////
+
+@media screen and (max-width: $mobile-size) {
+  .slot-info-container {
+    .slot-info {
+      margin: 0 auto;
+      padding: 5vw 0;
+      width: 100%;
+      .week-info-container {
+        margin: 0 auto 4vw;
+        width: 92vw;
+        display: block;        
+        padding: 2%;        
+      }
+      .info-info-container {
+        margin: 0 4vw;
+      }
+      .exit-btn {        
+        padding: 0;
+        margin: 0 5vw 0;
+        height: 8vw;
+        width: auto;
+      }
+      p {
+      }
+      h3 {
+        margin: 0.6vw 0 0;
+        padding: 0;
+      }
+      .info-place {
+        margin: 0;
+      }
+      .info-instructor {
+        margin-top: 0;
+      }
+      .info-desc {
+        margin: 3vw 0;
+        padding: 0;
+      }
+    }
+    .inner {
+      width: 80%;
+    }
+  }
+
+  .contact-container {
+    text-align: left;
+  }
+
+  .container {
+    width: 100%;
+    margin: 0;
+    padding: 5vw 0;
+    h1 {
+
+      line-height: 0.7;
+      margin: 0;
+      padding: 0;
+    }
+    small {
+      width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 0;
+    }
+  }
+
+  .login-container {
+    width: 100%;
+    margin: 0 auto;
+    background: $container-color;
+    border: 1px solid $border;
+    border-radius: $container-radius;
+    box-sizing: border-box;
+    form {
+      padding: 2vw;
+      box-sizing: border-box;
+    }
+    button {
+      width: 100%;
+      margin-top: 2vw;
+    }
+  }
+  .register-container {
+    p {
+      margin: 4vw 0;
+    }
+  }
+
+  .content-container {
+    width: 96vw;
+    margin: 0 auto;
+    box-sizing: border-box;
+    padding: 0;
+  }
+  .transaction-container {
+    width: 100%;
+    margin: 0 auto;
+    box-sizing: border-box;
+    padding: 10;
+  }
+  .booking-container {
+    width: 100%;
+    margin: 0 auto;
+    box-sizing: border-box;
+    padding: 10;
+  }
+  .colored-container {
+    h1 {
+      padding: 0;
+    }
+  }
+  .surrounded-container {
+    padding: 4vw;
+  }
+  .info-price {
+    span {
+      margin: 0 0 3vw;
+    }  
+  }
+
+  .tickets-container {
+    display: inline-block;
+    width: 40%;
+    vertical-align: top;
+  }
+
+  .userinfo-container {
+    display: inline-block;
+    text-align: right;
+    margin-bottom: 2vw;
+    width: 60%;
+  }
+
+  .mobile-row {
+    width: 100%;
+    margin-top: 4vw;
+  }
+
+  .user-header-container {
+    margin: 0;
+    padding: 0;
+  }
+
+  .mailbtn-container {
+    margin: 0;
+    padding: 2vw 0;
+  }
+
+  .paytrail-container {
+    width: 100%;
+  }
+}
+
+
+/////////////////////////////////////////////////////
+// DESKTOP
+/////////////////////////////////////////////////////
+
+@media screen and (min-width: $desktop-size) {
+  .slot-info-container {
+    .slot-info {
+      border-radius: $container-radius;
+      margin: 50px auto;
+      padding: 20px;
+      width: 100%;
+      max-width: 500px;
+      border: 1px solid #888;
+      .week-info-container {
+        margin: 0 0 10px;
+        width: 100%;
+        display: inline-block;
+        vertical-align: text-top;
+        box-sizing: border-box;
+        padding: 1%;        
+      }
+      .info-info-container {
+        margin: 0;
+      }
+      .exit-btn {
+        
+        height: 26px;
+        width: auto;
+        margin: 0;
+      }
+      h3 {
+        margin: 5px 0 0;
+        padding: 0;
+      }
+      .info-place {
+        margin: 0;
+      }
+      .info-instructor {
+        margin-top: 0;
+      }
+      .info-desc {
+        margin: 15px 0;
+        padding: 0;
+      }
+    }
+    .inner {
+      width: 400px;
+      padding: 4vw;
+    }
+  }
+
+  .contact-container {
+    text-align: left;
+  }
+
+  .container {
+    width: 100%;
+    margin: 0 auto;
+    padding: 40px 0;
+    h1 {
+      line-height: 0.7;
+      margin: 0;
+      padding: 0;
+    }
+  }
+  .content-container {
+    width: 100%;
+    max-width: $desktop-size;
+    margin: 0 auto;
+  }
+
+  .login-container {
+    width: 100%;
+    max-width: 350px;
+    margin: 0 auto;
+    padding: 15px;
+    background: $container-color;
+    border: 1px solid $border;
+    border-radius: $container-radius;
+    button {
+      width: 100%;
+      margin-top: 12px;
+    }
+  }
+  .register-container {
+    p {
+      margin: 15px 0 15px;
+    }
+  }
+
+  .transaction-container {
+    width: 100%;
+    max-width: $desktop-size;
+    margin: 0 auto;
+  }
+
+  .booking-container {
+    width: 100%;
+    max-width: $desktop-size;
+    margin: 0 auto;
+  }
+
+  .colored-container {
+    h1 {
+      padding: 0;
+    }
+  }
+  .surrounded-container {
+    padding: 12px;
+  }
+
+  .info-price {
+    span {
+      margin: 0 0 10px;
+    }  
+  }
+
+  .tickets-container {
+    display: inline-block;
+    margin: 0;
+    padding: 0;
+    width: 18%;
+    vertical-align: top;
+  }
+
+  .userinfo-container {
+    display: inline-block;
+    margin-top: 20px;
+    width: 82%;
+    a {
+      display: inline-block;
+      margin-right: 2px;
+    }
+  }
+
+  .mobile-row {
+    display: inline-block;
+  }
+
+  .user-header-container {
+    margin: 0;
+    padding: 10px 0;
+  }
+
+  .mailbtn-container {
+    margin: 0;
+    padding: 5px 0;
+  }
+
+  .checkout-container {
+    max-width: 300px;
+  }
+
+  .paytrail-container {
+    max-width: 500px;
+  }
+}
+
+/////////////////////////////////////////////////////
+// ALL
+/////////////////////////////////////////////////////
+
+.slot-info-container {
+  position: fixed;
+  z-index: 1;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.5);
+  .slot-info {
+    background-color: $body-color;
+    box-shadow: 0 3px 10px $text-dark;
+    .week-info-container {
+      background-color: $white;
+      box-sizing: border-box;
+      border: 1px solid $border;
+      border-radius: $container-radius;
+    }
+    .exit-btn {
+      float: right;
+      background-color: transparent;
+    }
+    .info-time {
+      color: $blue;
+    }
+    .info-desc {
+      color: $text-fade;
+    }
+    .info-place {
+      color: $text-dark;
+    }
+    .info-instructor {
+      color: $text-dark;
+    }
+    .info-reserved {
+      color: $text-dark;
+    }
+    .info-participants {
+      color: $text-fade;
+    }
+    .info-keptweek {
+      color: $text-fade;
+    }
+    .info-cantreserve {
+      color: $red;
+    }
+    .info-noreservations {
+      color: $red;
+    }
+  }
+
+  .outer {
+    display: table;
+    position: absolute;
+    height: 100%;
+    width: 100%;
+  }
+  .middle {
+    display: table-cell;
+    vertical-align: middle;
+  }
+  .inner {
+    margin: 0 auto;
+    padding: 20px 0;
+    background-color: rgba(255,255,255, 0.9);
+    box-shadow: 0 3px 10px $text-dark;
+    border-radius: $container-radius;
+  }
+}
+
+.main-header-container {
+  h1 {
+    text-transform: uppercase;
+  }
+}
+
+.container {
+  background: $body-color;
+  box-sizing: border-box;
+  .content-container {
+    box-sizing: border-box;
+  }
+}
+.bordered-container {
+  border-bottom: 1px solid $border;
+}
+.colored-container {
+  background-color: $blue;
+  h1 {
+    color: $white;
+  }
+  p {
+    color: $white;
+  }
+  a {
+    color: $white;
+  }
+}
+
+.surrounded-container {
+  background: $container-color;
+  border: 1px solid $border;
+  border-radius: $container-radius;
+}
+
+.transparent-bg {
+  background: transparent;
+}
+
+.info-price {
+  margin: 0;
+  padding: 0;
+  color: $blue;
+  span {
+    display: inline-block;
+  }  
+}
+
+.light-bg {
+  background-color: $container-color;
+}
+
+.header-container {
+  margin: 0;
+  padding-bottom: 0;
+}
+
+.user-header-container {
+  background-color: $body-color;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.container-shadow {
+  box-shadow: $shadow;
+}
+
+.halved-container {
+  width: 60%;
+  display: inline-block;
+}

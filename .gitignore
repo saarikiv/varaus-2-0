@@ -1,0 +1,15 @@
+.vscode/
+.kiro/
+.antigravity/
+.git/
+*.log
+coordination/node_modules/
+varaus/node_modules/
+varausserver/node_modules/
+node_modules/
+varausserver/public/varaus-stage.json
+varausserver/public/varaus-prod.json
+varausserver/public/index.js
+varaus/src/config.js
+varaus/public/config.js
+varaus/public/index.html

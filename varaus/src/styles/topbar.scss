@@ -1,0 +1,43 @@
+@import 'variables.scss';
+
+/////////////////////////////////////////////////////
+// MOBILE
+/////////////////////////////////////////////////////
+
+@media screen and (max-width: $mobile-size) {
+    .authentication-bar {
+    height:10vw;
+    text-align: center;
+    > * {
+      margin-right: 4vw;
+    }
+  }
+}
+
+/////////////////////////////////////////////////////
+// DESKTOP
+/////////////////////////////////////////////////////
+
+@media screen and (min-width: $desktop-size) {
+  .authentication-bar {
+    height:50px;
+    text-align: center;
+    > * {
+      margin-right: 20px;
+    }
+  }
+}
+
+/////////////////////////////////////////////////////
+// ALL
+/////////////////////////////////////////////////////
+
+.authentication-bar {
+  width:100%;
+  display:block;
+  top:0;
+  left:0;
+  > * {
+    display: inline;
+  }
+}

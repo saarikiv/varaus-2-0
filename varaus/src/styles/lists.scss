@@ -1,0 +1,196 @@
+@import 'variables.scss';
+
+/////////////////////////////////////////////////////
+// MOBILE
+/////////////////////////////////////////////////////
+
+@media screen and (max-width: $mobile-size) {
+  .narrow-list {
+    width: 100%;
+    margin: 0 auto 3vw;
+    padding: 0;
+    box-sizing: border-box;
+    li {
+      width: 100%;
+      display: inline-block;
+      margin: 0 0 2vw;
+      padding: 3.6vw 0;
+      text-align: center;
+    }
+  }
+
+  .shop-list {
+    width: 100%;
+    margin: 0 auto 3vw;
+    padding: 0;
+    box-sizing: border-box;
+    li {
+      width: 100%;
+      display: inline-block;
+      margin: 0 0 2vw;
+      padding: 2vw;
+    }
+  }
+  .text-list-item {
+    span {
+      margin-top: 3vw;
+    }
+    button {
+      margin-top: 2vw;
+    }
+  }
+
+  ul.wide-list {
+    padding: 0;
+    width: 100%;
+    margin: 0 auto;
+    li {
+      padding: 3vw;
+      margin: 2vw 0;
+      h3 {
+        padding: 0;
+        margin: 0;
+      }
+    }   
+    .onerow-item {
+      margin: 2vw 0 0 0;
+    } 
+  }
+
+  .item-item {
+    margin-right: 2vw;
+  }
+
+  ul.blank-list {
+    li {
+      margin-bottom: 4vw;
+    }  
+  }
+}
+
+/////////////////////////////////////////////////////
+// DESKTOP
+/////////////////////////////////////////////////////
+
+@media screen and (min-width: $desktop-size) {
+  .narrow-list {
+    width: 100%;
+    margin: 0 auto 15px;
+    padding: 0;
+    li {
+      vertical-align: top;
+      width: 32%;
+      display: inline-block;
+      margin: 0 5px 5px 0;
+      padding: 26px 0;
+      text-align: center;
+    }
+  }
+
+  .shop-list {
+    width: 100%;
+    margin: 0 auto 15px;
+    padding: 0;
+    li {
+      vertical-align: top;
+      width: 49%;
+      display: inline-block;
+      margin: 0 5px 5px 0;
+      padding: 15px;
+    }
+  }
+
+  .text-list-item {
+    span {
+      margin-top: 14px;
+    }
+    button {
+      margin-top: 6px;
+    }
+  }
+  .table-alert {
+    height: 20px;
+  }
+  .table-alert-c {
+    height: 22px;
+  }
+  .table-alert-f {
+    height: 20px;
+  }
+
+  ul.wide-list {
+    padding: 0;
+    width: 100%;
+    margin: 0 auto;
+    li {
+      padding: 12px;
+      margin: 10px 0;
+      h3 {
+        padding: 0;
+        margin: 0;
+      }
+    }
+    .onerow-item {
+      margin: 8px 0 0 0;
+    }
+  }
+
+  .item-item {
+    margin-right: 25px;
+  }
+
+  ul.blank-list {
+    li {
+      margin-bottom: 10px;
+    }  
+  }
+}
+
+/////////////////////////////////////////////////////
+// ALL
+/////////////////////////////////////////////////////
+
+ul {
+  list-style-type: none;
+}
+
+.item-expiration {
+  color: $blue;
+}
+
+.wide-list {
+  li {
+    background: $container-color;
+    border-radius: $container-radius;
+    border: 1px solid $border;
+    box-sizing: border-box;
+    .item-row {
+      width: 100%;
+      display: inline-block;
+      margin: 0;
+    }
+  }
+}
+
+.narrow-list, .shop-list {
+  li {
+    background: $container-color;
+    border-radius: $container-radius;
+    border: 1px solid $border;
+    box-sizing: border-box;
+  }
+}
+
+.special-slot-item {
+  &:hover {
+    background: $lightblue;
+    cursor: pointer;
+  }
+}
+
+ul.blank-list {
+  li {
+    background: transparent;
+    border: none;
+  }  
+}

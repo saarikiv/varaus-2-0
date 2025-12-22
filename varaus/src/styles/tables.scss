@@ -1,0 +1,182 @@
+@import 'variables.scss';
+
+/////////////////////////////////////////////////////
+// MOBILE
+/////////////////////////////////////////////////////
+
+@media screen and (max-width: $mobile-size) {
+  table {
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 2vw;
+    tr {
+      vertical-align: text-top;
+      margin: 0 auto 5vw;
+      width: 100%;
+      display: inline-block;
+      th, td {
+        width: 100%;
+        display: block;
+      }
+      th {
+        font-size: 5vw;
+      }
+      td {
+        padding: 4vw 0;
+        .table-time {
+          margin-top: 0.2vw;
+        }
+        .table-slot, .table-time {
+          margin-bottom: 1vw;
+        }
+        h3 {
+          margin: 0;
+          padding: 0;
+        }
+        p {
+          margin: 0;
+          padding: 0;
+        }
+      }
+    }
+  }
+  .table-participants {
+    margin: 0 0 0 0.5vw;
+  }
+  .mini-icon {
+    margin: 0.2vw 0.5vw 0 0;
+    height: 5.5vw;
+  }
+  .tiny-icon {
+    height: 4.2vw;
+  }
+
+  .td-orange {
+      border-left: $indWidthMobile solid $orange;
+      border-right: $indWidthMobile solid transparent;
+  }
+
+  .td-blue {
+      border-left: $indWidthMobile solid $blue;
+      border-right: $indWidthMobile solid transparent;
+  }
+
+  .td-green {
+      border-left: $indWidthMobile solid $green;
+      border-right: $indWidthMobile solid transparent;
+  }
+}
+
+/////////////////////////////////////////////////////
+// DESKTOP
+/////////////////////////////////////////////////////
+
+@media screen and (min-width: $desktop-size) {
+  table {
+    margin: 0 auto;
+    padding: 0;
+    width: 100%;
+    tr {
+      vertical-align: text-top;
+      margin: 0 5px 20px 0;
+      width: 100%;
+      max-width: 124px;
+      display: inline-block;
+      th, td {
+        width: 100%;
+        display: block;
+      }
+      th {
+        font-size: 16px;
+      }
+      td {
+        padding: 12px 0;
+        .table-time {
+          margin-top: 2px;
+        }
+        .table-slot, .table-time {
+          margin-bottom: 5px;
+        }
+        h3 {
+          margin: 0;
+          padding: 0;
+        }
+        p {
+          margin: 0;
+          padding: 0;
+        }
+      }
+    }
+  }
+  .table-participants {
+    margin: 2px 0 0 3px;
+  }
+  .mini-icon {
+    margin: 1px 3px 0 0;
+    height: 18px;
+  }
+
+  .td-orange {
+      border-left: $indWidthPc solid $orange;
+      border-right: $indWidthPc solid transparent;
+  }
+
+  .td-blue {
+      border-left: $indWidthPc solid $blue;
+      border-right: $indWidthPc solid transparent;
+  }
+
+  .td-green {
+      border-left: $indWidthPc solid $green;
+      border-right: $indWidthPc solid transparent;
+  }
+}
+
+/////////////////////////////////////////////////////
+// ALL
+/////////////////////////////////////////////////////
+
+table {
+  tr {
+    background: $white;
+    border-radius: $container-radius;
+    box-sizing: border-box;
+    border: 1px solid $border;
+    td {
+      border-top: 1px solid $border;
+      transition: background 0.1s;
+      box-sizing: border-box;
+      .table-slot {
+        color: $text-dark;
+      }
+
+      &:hover {
+        background: $lightblue;
+        cursor: pointer;
+      }
+    }
+    th {
+      border-top-left-radius: $container-radius;
+      border-top-right-radius: $container-radius;
+      background: $lightgray;
+      border: none;
+      box-sizing: border-box;
+      color: $text-dark;
+    }
+  }
+}
+.table-participants {
+  display: inline-block;
+  vertical-align: top;
+  color: $text-fade;
+}
+.mini-icon {
+  display: inline-block;
+  width: auto;
+}
+.table-time {
+  color: $text-fade;
+}
+.table-nonmargin {
+  margin-top: 0;
+}

@@ -1,0 +1,94 @@
+{
+    "rules": {
+        "users": {
+            ".read": "auth.uid === 'varausserver' || root.child('specialUsers').child(auth.uid).child('admin').val() == true || root.child('specialUsers').child(auth.uid).child('instructor').val() == true",
+            ".write": "auth.uid === 'varausserver'  || root.child('specialUsers').child(auth.uid).child('admin').val() == true || root.child('specialUsers').child(auth.uid).child('instructor').val() == true",
+            "$userId": {
+                ".read": "auth.uid === $userId || root.child('specialUsers').child(auth.uid).child('instructor').val() == true",
+                ".write": "auth.uid === $userId"
+            }
+        },
+        "cancelledSlots": {
+            ".read": "auth != null",
+            ".write": "auth.uid === 'varausserver' || root.child('specialUsers').child(auth.uid).child('instructor').val() == true"
+        },
+        "infoItems": {
+            ".read": "true",
+            ".write": "auth.uid === 'varausserver' || root.child('specialUsers').child(auth.uid).child('admin').val() == true"
+        },
+        "diagnostics": {
+            ".read": "auth.uid === 'varausserver' || root.child('specialUsers').child(auth.uid).child('admin').val() == true",
+            ".write": "true"
+        },
+        "terms": {
+            ".read": "true",
+            ".write": "auth.uid === 'varausserver' || root.child('specialUsers').child(auth.uid).child('admin').val() == true"
+        },
+        "bookingsbyslot": {
+            ".read": "auth != null",
+            ".write": "auth.uid === 'varausserver'"
+        },
+        "scbookingsbyslot": {
+            ".read": "auth != null",
+            ".write": "auth.uid === 'varausserver'"
+        },
+        "specialUsers": {
+            ".read": "auth.uid === 'varausserver' || root.child('specialUsers').child(auth.uid).child('admin').val() == true || root.child('specialUsers').child(auth.uid).child('instructor').val() == true",
+            ".write": "auth.uid === 'varausserver' || root.child('specialUsers').child(auth.uid).child('admin').val() == true || root.child('specialUsers').child(auth.uid).child('instructor').val() == true",
+            "$userId": {
+                ".read": "auth.uid === 'varausserver' || auth.uid === $userId",
+                ".write": "auth.uid === 'varausserver' || root.child('specialUsers').child(auth.uid).child('admin').val() == true"
+            }
+        },
+        "scbookingsbyuser": {
+            "$userId": {
+                ".read": "auth.uid === 'varausserver' || auth.uid === $userId",
+                ".write": "auth.uid === 'varausserver'"
+            }
+        },
+        "bookingsbyuser": {
+            "$userId": {
+                ".read": "auth.uid === 'varausserver' || auth.uid === $userId",
+                ".write": "auth.uid === 'varausserver'"
+            }
+        },
+        "transactions": {
+            "$userId": {
+                ".read": "auth.uid === 'varausserver' || auth.uid === $userId || root.child('specialUsers').child(auth.uid).child('admin').val() == true || root.child('specialUsers').child(auth.uid).child('instructor').val() == true",
+                ".write": "auth.uid === 'varausserver'"
+            }
+        },
+        "pendingtransactions": {
+            ".read": "auth.uid === 'varausserver' || root.child('specialUsers').child(auth.uid).child('admin').val() == true",
+            ".write": "auth.uid === 'varausserver' || root.child('specialUsers').child(auth.uid).child('admin').val() == true"
+        },
+        "slotTypes": {
+            ".read": "auth != null",
+            ".write": "root.child('specialUsers').child(auth.uid).child('admin').val() == true"
+        },
+        "serverError": {
+            ".read": "auth.uid === 'varausserver'",
+            ".write": "auth.uid === 'varausserver'"
+        },
+        "slots": {
+            ".read": "auth != null",
+            ".write": "root.child('specialUsers').child(auth.uid).child('admin').val() == true"
+        },
+        "specialSlots": {
+            ".read": "auth != null",
+            ".write": "root.child('specialUsers').child(auth.uid).child('admin').val() == true"
+        },
+        "places": {
+            ".read": "auth != null",
+            ".write": "root.child('specialUsers').child(auth.uid).child('admin').val() == true"
+        },
+        "instructors": {
+            ".read": "auth != null",
+            ".write": "root.child('specialUsers').child(auth.uid).child('admin').val() == true"
+        },
+        "shopItems": {
+            ".read": "auth != null",
+            ".write": "root.child('specialUsers').child(auth.uid).child('admin').val() == true"
+        }
+    }
+}
