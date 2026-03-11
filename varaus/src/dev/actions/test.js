@@ -19,30 +19,6 @@ export function test1(url) {
     }
 }
 
-export function test2(query) {
-    return dispatch => {
-        _showLoadingScreen(dispatch, "Aloitetaan testit")
-        let VARAUSURL = 'http://localhost:3000/completepaytrail'
-        firebase.auth().currentUser.getToken(true)
-        .then(idToken => {
-            return axios.post(VARAUSURL, {
-                current_user: idToken,
-                METHOD: query.METHOD,
-                ORDER_NUMBER: query.ORDER_NUMBER,
-                PAID: query.PAID,
-                RETURN_AUTHCODE: query.RETURN_AUTHCODE,
-                TIMESTAMP: query.TIMESTAMP
-            })
-        })
-        .then(response => {
-            _hideLoadingScreen(dispatch, "Testi 2 onnistui", true)
-        })
-        .catch(error => {
-            console.error("TEST-failed: ", error);
-            _hideLoadingScreen(dispatch, "Testi 2 epäonnistui: " + error, false,5000)
-        });
-    }
-}
 
 export function testFirebaseErrorLogging() {
     return dispatch => {

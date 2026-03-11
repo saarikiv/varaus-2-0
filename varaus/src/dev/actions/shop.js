@@ -9,22 +9,21 @@ import {
     FETCH_SHOP_ITEMS,
     ADD_TO_CART,
     BUY_WITH_CASH,
-    BUY_WITH_PAYTRAIL,
     DO_PURCHASE_TRANSACTION,
     CHECKOUT_ERROR,
     CHECKOUT_TIMEOUT,
     EXECUTE_CASH_PURCHASE,
     RESET_SHOP,
     BUY_DELAYED,
-    FETCH_PENDING_TRANSACTIONS,
-    FINISH_WITH_PAYTRAIL,
-    GET_AUTH_CODE
+    FETCH_PENDING_TRANSACTIONS
 } from './actionTypes.js'
 
 import {
     _hideLoadingScreen,
     _showLoadingScreen
 } from './loadingScreen.js'
+
+import { filterShopItems } from '../helpers/shopHelper.js'
 
 const ShopItemsRef = firebase.database().ref('/shopItems/')
 
@@ -48,7 +47,7 @@ export function removeTransaction(transaction, user){
                 })
             })
             .catch(error => {
-                console.error("PAYTRAIL_ERROR:", error);
+                console.error("REMOVE_TRANSACTION_ERROR:", error);
                 _hideLoadingScreen(dispatch, "Oston perumisessa tapahtui virhe: " + error.data, false, 5000)
                 dispatch({
                     type: REMOVE_TRANSACTION_ERROR,
@@ -79,7 +78,7 @@ export function okTransaction(transaction, user){
                 })
             })
             .catch(error => {
-                console.error("PAYTRAIL_ERROR:", error);
+                console.error("OK_TRANSACTION_ERROR:", error);
                 _hideLoadingScreen(dispatch, "Maksun kuittaamisessa tapahtui virhe: " + error.data, false, 5000)
                 dispatch({
                     type: OK_TRANSACTION_ERROR,
@@ -111,14 +110,14 @@ function _completePendingPayment(dispatch, pendingTrxId){
             _hideLoadingScreen(dispatch, "Osto hyväksytty", true)
         })
         .catch(error => {
-            console.error("PAYTRAIL_ERROR:", error);
+            console.error("PENDING_PAYMENT_ERROR:", error);
             _hideLoadingScreen(dispatch, "Oston hyväksymisessä tapahtui virhe: " + error.toString(), false)
             dispatch({
                 type: CHECKOUT_ERROR,
                 payload: {
                     error: {
-                        code: "PAYTRAIL_ERROR",
-                        message: "Paytrail complete error: " + error.toString()
+                        code: "PENDING_PAYMENT_ERROR",
+                        message: "Pending payment complete error: " + error.toString()
                     }
                 }
             })
@@ -163,6 +162,27 @@ export function  stopFetchPendingTransactions(){
     }
 }
 
+function _cancelPendingTransaction(dispatch, id){
+    firebase.database().ref('/pendingtransactions/' + id).remove()
+        .then(() => {
+            dispatch({
+                type: RESET_SHOP
+            })
+        })
+        .catch(error => {
+            console.error("CANCEL_PENDING_ERROR:", error);
+            dispatch({
+                type: CHECKOUT_ERROR,
+                payload: {
+                    error: {
+                        code: "CANCEL_PENDING_ERROR",
+                        message: "Cancel pending transaction error: " + error.toString()
+                    }
+                }
+            })
+        })
+}
+
 export function resetShop(shopItems = null){
     return dispatch => {
         if(shopItems === null){
@@ -171,26 +191,38 @@ export function resetShop(shopItems = null){
             })
         } else {
             if(shopItems.initializedTransaction !== "0"){ //We need to clear the pending transaction.
-                _cancelPaytrailPayment(dispatch, shopItems.initializedTransaction);
+                _cancelPendingTransaction(dispatch, shopItems.initializedTransaction);
             }
         }
     }
 }
 
-export function buyWithPaytrail(pendingTrxId) {
+export function cancelPendingTransaction(id) {
     return dispatch => {
-        dispatch({
-            type: BUY_WITH_PAYTRAIL,
-            payload: {
-                phase: "payTrailPayment",
-                error: {
-                    code: "0",
-                    message: "no error"
-                }
-            }
-        })
+        _showLoadingScreen(dispatch, "Perutaan tapahtuma")
+        firebase.database().ref('/pendingtransactions/' + id).remove()
+            .then(() => {
+                _hideLoadingScreen(dispatch, "Tapahtuma peruttu", true)
+                dispatch({
+                    type: RESET_SHOP
+                })
+            })
+            .catch(error => {
+                console.error("CANCEL_PENDING_ERROR:", error);
+                _hideLoadingScreen(dispatch, "Tapahtuman perumisessa tapahtui virhe: " + error.toString(), false)
+                dispatch({
+                    type: CHECKOUT_ERROR,
+                    payload: {
+                        error: {
+                            code: "CANCEL_PENDING_ERROR",
+                            message: "Cancel pending transaction error: " + error.toString()
+                        }
+                    }
+                })
+            })
     }
 }
+
 
 export function buyDelayed(pendingTrxId) {
     return dispatch => {
@@ -234,188 +266,6 @@ export function buyDelayed(pendingTrxId) {
     }
 }
 
-
-export function finishPayTrailTransaction(query){
-        return dispatch => {
-        _showLoadingScreen(dispatch, "Viimeistellään osto")
-        let VARAUSURL = typeof(VARAUSSERVER) === "undefined" ? 'http://localhost:3000/completepaytrail' : VARAUSSERVER + '/completepaytrail'
-        firebase.auth().currentUser.getToken(true)
-            .then(idToken => {
-                return axios.post(VARAUSURL, {
-                    current_user: idToken,
-                    METHOD: query.METHOD,
-                    ORDER_NUMBER: query.ORDER_NUMBER,
-                    PAID: query.PAID,
-                    RETURN_AUTHCODE: query.RETURN_AUTHCODE,
-                    TIMESTAMP: query.TIMESTAMP
-                })
-            })
-            .then(response => {
-                _hideLoadingScreen(dispatch, "Osto valmis", true)
-                dispatch({
-                    type: FINISH_WITH_PAYTRAIL,
-                    payload: {
-                        phase: "payTrailComplete",
-                        error: {
-                            code: "0",
-                            message: "no error"
-                        }
-                    }
-                })
-            })
-            .catch(error => {
-                console.error("PAYTRAIL_ERROR:", error);
-                _hideLoadingScreen(dispatch, "Oston viimeistelyssä tapahtui virhe: " + error, false)
-                dispatch({
-                    type: CHECKOUT_ERROR,
-                    payload: {
-                        error: {
-                            code: "PAYTRAIL_ERROR",
-                            message: "Paytrail complete error: " + error
-                        }
-                    }
-                })
-            });
-    }
-}
-
-export function getAuthCode(_authcode) {
-    return dispatch => {
-        _showLoadingScreen(dispatch, "Haetaan tunnistekoodia")
-        let VARAUSURL = typeof(VARAUSSERVER) === "undefined" ? 'http://localhost:3000/paytrailauthcode' : VARAUSSERVER + '/paytrailauthcode'
-        firebase.auth().currentUser.getToken(true)
-            .then(idToken => {
-                return axios.post(VARAUSURL, {
-                    current_user: idToken,
-                    auth_code: _authcode
-                })
-            })
-            .then(response => {
-                _hideLoadingScreen(dispatch, "Tunniste valmis", true)
-                dispatch({
-                    type: GET_AUTH_CODE,
-                    payload: {
-                        authCode: response.data,
-                        error: {
-                            code: "0",
-                            message: "no error"
-                        }
-                    }
-                })
-            })
-            .catch(error => {
-                console.error("AUTHCODE_ERROR:", error);
-                _hideLoadingScreen(dispatch, "Tunnisteen hakemisessa tapahtui virhe: " + error, false)
-                dispatch({
-                    type: CHECKOUT_ERROR,
-                    payload: {
-                        error: {
-                            code: "AUTHCODE_ERROR",
-                            message: "AuthCode error: " + error
-                        }
-                    }
-                })
-            });
-    }
-}
-
-export function cancelPaytrailPayment(pendingTrxId, resetShop = true){
-    return dispatch => {
-        _cancelPaytrailPayment(dispatch, pendingTrxId, resetShop)
-    }
-}
-
-
-function _cancelPaytrailPayment(dispatch, pendingTrxId, resetShop = true) {
-    _showLoadingScreen(dispatch, "Perutaan PayTrail maksu")
-    let VARAUSURL = typeof(VARAUSSERVER) === "undefined" ? 'http://localhost:3000/cnacelpaytrailtransaction' : VARAUSSERVER + '/cancelpaytrailtransaction'
-
-    firebase.auth().currentUser.getToken(true)
-        .then(idToken => {
-            return axios.post(VARAUSURL, {
-                current_user: idToken,
-                pending_transaction: pendingTrxId
-            })
-        })
-        .then(result => {
-            _hideLoadingScreen(dispatch, "Maksun peruminen onnistui", true)
-
-            if(resetShop){
-                dispatch({
-                    type: RESET_SHOP
-                })
-            } else {
-                //This is here for PaytrailCancel view needs. We need to clear location history.
-                //View will call resetShop when unmounts.
-                dispatch({
-                    type: FINISH_WITH_PAYTRAIL,
-                    payload: {
-                        phase: "payTrailComplete",
-                        error: {
-                            code: "0",
-                            message: "no error"
-                        }
-                    }                
-                })
-            }
-        })
-        .catch(error => {
-            console.error("PURCHASE ERROR", error);
-            _hideLoadingScreen(dispatch, "Maksun perumisessa tapahtui virhe: "+ error, false)
-            dispatch({
-                type: CHECKOUT_ERROR,
-                payload: {
-                    error: {
-                        code: "PURCHASE_ERROR",
-                        message: "Purchase error: " + error
-                    }
-                }
-            })
-        })
-}
-
-export function initializePayTrailTransaction(shopItem, type) {
-    return dispatch => {
-        _showLoadingScreen(dispatch, "Alustetaan maksutapahtuma")
-        let VARAUSURL = typeof(VARAUSSERVER) === "undefined" ? 'http://localhost:3000/initializepaytrailtransaction' : VARAUSSERVER + '/initializepaytrailtransaction'
-
-        firebase.auth().currentUser.getToken(true)
-            .then(idToken => {
-                return axios.post(VARAUSURL, {
-                    item_key: shopItem,
-                    current_user: idToken,
-                    purchase_target: type
-                })
-            })
-            .then(result => {
-                _hideLoadingScreen(dispatch, "Maksun alustus onnistui", true)
-                dispatch({
-                    type: DO_PURCHASE_TRANSACTION,
-                    payload: {
-                        phase: "payTrailInitialized",
-                        initializedTransaction: result.data,
-                        error: {
-                            code: "0",
-                            message: "no error"
-                        }
-                    }
-                })
-            })
-            .catch(error => {
-                console.error("PURCHASE ERROR", error);
-                _hideLoadingScreen(dispatch, "Maksun suorituksessa tapahtui virhe: "+ error, false)
-                dispatch({
-                    type: CHECKOUT_ERROR,
-                    payload: {
-                        error: {
-                            code: "PURCHASE_ERROR",
-                            message: "Purchase error: " + error
-                        }
-                    }
-                })
-            })
-    }
-}
 
 export function initializeDelayedTransaction(shopItem, type) {
     return dispatch => {
@@ -535,22 +385,11 @@ export function waitForMilliseconds(milliseconds) {
 }
 
 export function fetchShopItems(oneTime) {
-    var list = Object.assign([])
     return dispatch => {
         _showLoadingScreen(dispatch, "Haetaan tuotteet")
         ShopItemsRef.once('value', snapshot => {
                 var shopItems = snapshot.val()
-                for (var key in shopItems) {
-                    if (shopItems.hasOwnProperty(key) && !shopItems[key].locked) {
-                        if( oneTime.find( listItem => { return listItem === key})){
-                            //console.log("OneTimer already purchased");
-                        } else {
-                            let shopItemWithKey = shopItems[key]
-                            shopItemWithKey.key = key
-                            list = list.concat(shopItemWithKey)
-                        }
-                    }
-                }
+                var list = filterShopItems(shopItems, oneTime)
                 _hideLoadingScreen(dispatch, "Tuotteet haettu", true)
                 dispatch({
                     type: FETCH_SHOP_ITEMS,

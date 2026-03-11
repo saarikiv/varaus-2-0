@@ -6,6 +6,7 @@ import { reduxForm, Field } from 'redux-form'
 
 import * as actionCreators from '../actions/auth.js'
 import Terms from '../components/home/Terms.jsx'
+import { validateRegistration } from '../helpers/validationHelper.js'
 
 class Register extends React.Component {
 
@@ -95,28 +96,7 @@ class Register extends React.Component {
   }
 }
 
-const validate = values => {
-  const errors = {}
-  const emailPattern = /(.+)@(.+){2,}\.(.+){2,}/
-  if (!emailPattern.test(values.email)) {
-    errors.email = 'Sähköpostiosoite on väärässä muodossa.'
-  }
-  if (!values.password) {
-    errors.password = 'Pakollinen kenttä.'
-  } else if (values.password.length < 6) {
-    errors.password = 'Salasanan on oltava vähintään 6 merkkiä pitkä.'
-  }
-  if (!values.firstName) {
-    errors.firstName = 'Pakollinen kenttä.'
-  }
-  if (!values.lastName) {
-    errors.lastName = 'Pakollinen kenttä.'
-  }
-  if (!values.terms) {
-    errors.terms = 'Sinun tulee hyväksyä käyttöehdot.'
-  }
-  return errors
-}
+const validate = validateRegistration;
 
 function mapStateToProps(state) {
   return { auth: state.auth, currentUser: state.currentUser }

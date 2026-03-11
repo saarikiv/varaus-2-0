@@ -15,6 +15,11 @@ import {
     _showLoadingScreen
 } from './loadingScreen.js'
 
+import {
+    filterPastBookings,
+    separateBookingsByUser
+} from '../helpers/bookingHelper.js'
+
 
 export function postCancellation(item, txRef, slotInfo) {
     var VARAUSURL = typeof(VARAUSSERVER) === "undefined" ? 'http://localhost:3000/cancelSlot' : VARAUSSERVER + '/cancelSlot'
@@ -88,62 +93,24 @@ export function postReservation(forward, slotInfo) {
     }
 }
 
-function processBookings(inputBookings, uid, bookings, userbookings, slot) {
-    let instanceId;
-    let instanceObj;
-    let booking = {}
-    let user;
-    let index = 0;
-    for (instanceId in inputBookings) {
-        //Booking is in the future - it counts!!
-        let referenceTime = Number(instanceId) + slot.end - slot.start
-        if (referenceTime > Date.now()) {
-            booking.instance = instanceId;
-            booking.reservations = 0;
-            booking.participants = [];
-            instanceObj = inputBookings[instanceId];
-            for (user in instanceObj) {
-                booking.reservations++;
-                booking.participants.push({
-                    key: user,
-                    name: instanceObj[user].user,
-                    transactionReference: instanceObj[user].transactionReference
-                });
-                if (user === uid) {
-                    userbookings.push(Object.assign({
-                        item: instanceId,
-                        txRef: instanceObj[user].transactionReference
-                    }));
-                }
-            }
-            bookings.push(Object.assign({}, booking))
-            index++;
-        }
-    }
-    userbookings.sort((a, b) => {
-        return a.item - b.item
-    });
-    bookings.sort((a, b) => {
-        return a.instance - b.instance
-    })
+function processBookings(inputBookings, uid, slot) {
+    const slotDuration = slot.end - slot.start;
+    const filtered = filterPastBookings(inputBookings, slotDuration, Date.now());
+    return separateBookingsByUser(filtered, uid);
 }
 
 export function fetchSlotBookings(slot, uid) {
-    var bookings = []
-    var userbookings = []
     return dispatch => {
         var bkns = {}
         var returnObject;
         //Clear the booking details in case there are no bookings and the
         firebase.database().ref('/bookingsbyslot/' + slot.key).on('value', snapshot => {
             bkns = snapshot.val();
-            bookings = Object.assign([]);
-            userbookings = Object.assign([]);
-            processBookings(bkns, uid, bookings, userbookings, slot)
+            const { allBookings, userBookings } = processBookings(bkns, uid, slot);
             returnObject = Object.assign({})
             returnObject[slot.key] = {
-                all: bookings,
-                user: userbookings
+                all: allBookings,
+                user: userBookings
             }
             dispatch({
                 type: FETCH_SLOT_BOOKINGS,

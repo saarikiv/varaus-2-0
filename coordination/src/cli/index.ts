@@ -17,7 +17,9 @@ import { ConfigManager } from '../config';
 import { ProcessManagerImpl } from '../process';
 import { createHealthMonitor } from '../health';
 import { BuildCoordinatorImpl } from '../build';
-import { TestCoordinatorImpl } from '../test';
+import { TestCoordinatorImpl, TestType } from '../test';
+
+export type { TestType } from '../test';
 
 export interface CoordinationCLI {
   start(environment: Environment): Promise<void>;
@@ -27,8 +29,6 @@ export interface CoordinationCLI {
   status(): Promise<SystemStatus>;
   logs(application?: ApplicationName): Promise<LogStream>;
 }
-
-export type TestType = 'unit' | 'integration' | 'e2e' | 'all';
 export type DeploymentTarget = 'staging' | 'production';
 
 export interface BuildResult {
@@ -634,7 +634,7 @@ export class CoordinationCLIImpl implements CoordinationCLI {
   /**
    * Provide troubleshooting guidance based on error
    */
-  private provideTroubleshootingGuidance(error: unknown): void {
+  provideTroubleshootingGuidance(error: unknown): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     console.log('\n=== Troubleshooting Guidance ===\n');

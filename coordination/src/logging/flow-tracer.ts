@@ -3,36 +3,10 @@
  * Tracks complete request flow from frontend through backend with timing information
  */
 
-import { ApplicationName } from '../types';
+import { ApplicationName, FlowTrace, FlowStage, TimingBreakdown } from '../types';
 import { Logger, RequestTracer, TraceEvent } from './index';
 
-export interface FlowTrace {
-  correlationId: string;
-  startTime: Date;
-  endTime?: Date;
-  totalDuration?: number;
-  stages: FlowStage[];
-  timingBreakdown: TimingBreakdown;
-}
-
-export interface FlowStage {
-  name: string;
-  application: ApplicationName;
-  startTime: Date;
-  endTime?: Date;
-  duration?: number;
-  status: 'pending' | 'completed' | 'failed';
-  error?: string;
-  metadata?: Record<string, any>;
-}
-
-export interface TimingBreakdown {
-  frontendProcessing: number;
-  networkLatency: number;
-  backendProcessing: number;
-  databaseOperations: number;
-  totalRoundTrip: number;
-}
+export type { FlowTrace, FlowStage, TimingBreakdown };
 
 /**
  * Flow Tracer Implementation

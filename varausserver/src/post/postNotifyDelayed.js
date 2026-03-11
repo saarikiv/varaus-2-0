@@ -1,39 +1,38 @@
+const { validateBody } = require('../helpers/validateBody');
+
 exports.setApp = function(JPS) {
 
     //######################################################
-    // POST: cashbuy, post the item being purchased
+    // POST: notifydelayed
     //######################################################
-    JPS.app.post('/notifydelayed', (req, res) => {
+    JPS.app.post('/notifydelayed', JPS.authMiddleware, async (req, res) => {
 
-        JPS.now = Date.now();
-        console.log("notifydelayed requested.", JPS.now);
-        JPS.body = '';
-        req.on('data', (data) => {
-            JPS.body += data;
-            // Too much POST data, kill the connection!
-            // 1e6 === 1 * Math.pow(10, 6) === 1 * 1000000 ~~~ 1MB
-            if (JPS.body.length > 1e6) req.connection.destroy();
-        });
-        req.on('end', () => {
-            JPS.post = JSON.parse(JPS.body);
-            JPS.currentUserToken = JPS.post.current_user;
-            JPS.transaction = JPS.post.transaction;
-            console.log("POST:", JPS.post);
+        const now = Date.now();
+        console.log("notifydelayed requested.", now);
+        const post = req.body;
+        console.log("POST:", post);
 
-            JPS.firebase.auth().verifyIdToken(JPS.currentUserToken)
-                .then(decodedToken => {
-                    JPS.currentUserUID = decodedToken.uid || decodedToken.sub;
-                    console.log("User: ", JPS.currentUserUID, " requested notifydelayed");
-                    return JPS.firebase.database().ref('/users/' + JPS.currentUserUID).once('value');
-                })
-                .then(snapshot => {
-                    JPS.user = snapshot.val()
-                    JPS.mailer.sendNotifyDelayed(JPS.user, JPS.transaction)
-                    res.status(200).jsonp("Notify sent ok.").end()
-                }).catch(err => {
-                    console.error("Notify failde: ", err);
-                    res.status(500).jsonp( "Feedback failde." + String(err) ).end();
-                });
-        })
+        const validationErrors = validateBody(post, [
+            { field: 'current_user', type: 'string' },
+            { field: 'transaction', type: 'string' }
+        ]);
+        if (validationErrors.length > 0) {
+            return res.status(400).json({ error: validationErrors.join(', ') });
+        }
+
+        const transaction = post.transaction;
+
+        const currentUserUID = req.auth.uid;
+        const user = req.auth.user;
+
+        console.log("User: ", currentUserUID, " requested notifydelayed");
+
+        try {
+            JPS.mailer.sendNotifyDelayed(user, transaction)
+            res.status(200).json({ message: "Notify sent ok." });
+        } catch(err) {
+            console.error("Notify failed: ", err);
+            res.status(500).json({ error: "Notify failed: " + String(err) });
+        }
     })
 }

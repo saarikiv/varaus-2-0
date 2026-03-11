@@ -1,68 +1,57 @@
-
 module.exports = {
 
+    completePendingTransaction: async (JPS, pendingTransactionKey, externalReference, paymentInstrumentType, paymentMethod) => {
 
-    completePendingTransaction: (JPS, pendingTransactionKey, externalReference, paymentInstrumentType, paymentMethod) => {
+        try {
+            // Let's get the transaction at hand.
+            const snapshot = await JPS.firebase.database().ref('/pendingtransactions/' + pendingTransactionKey).once('value');
 
-        var promise = new Promise( (resolve, reject) => {
-//Promise/////////////////////////////////////////////////
-
-        // Let's get the transaction at hand.
-        JPS.firebase.database().ref('/pendingtransactions/' + pendingTransactionKey).once('value')
-        .then(snapshot => {
-            if(snapshot.val() !== null){
-                JPS.pendingTransaction = snapshot.val()
-                console.log("Processing pending transaction: ", JPS.pendingTransaction)
-                JPS.dataToUpdate = Object.assign(
-                    JPS.pendingTransaction.transaction, 
-                    JPS.pendingTransaction.shopItem, {
-                    details: {
-                        success: true,
-                        transaction: {
-                            pendingTransaction: pendingTransactionKey,
-                            amount: JPS.pendingTransaction.shopItem.price,
-                            currencyIsoCode: "EUR",
-                            id: externalReference,
-                            paymentInstrumentType: paymentInstrumentType,
-                            paymentMethod: paymentMethod
-                        }
-                    }
-                })
-                return JPS.firebase.database().ref('/transactions/'+JPS.pendingTransaction.user+'/'+JPS.pendingTransaction.timestamp)
-                .update(JPS.dataToUpdate)                    
+            if (snapshot.val() === null) {
+                throw new Error("PendingTransactionHelper: Pending transaction was not found: " + pendingTransactionKey);
             }
-            throw( new Error("PendingTransactionHelper: Pending transaction was not found: " + pendingTransactionKey))
-        }).then(() => {
-            console.log("Pending transaction processed succesfully. Removing pending record.");
-            return JPS.firebase.database().ref('/pendingtransactions/'+pendingTransactionKey).remove();
-        }).then(() => {
-            console.log("Pending record removed successfully.");
-            if(JPS.pendingTransaction.shopItem.type === "special"){
-                JPS.firebase.database().ref('/scbookingsbyslot/' + JPS.pendingTransaction.transaction.shopItemKey + '/' + JPS.pendingTransaction.user)
-                .update({transactionReference: JPS.pendingTransaction.timestamp, shopItem: JPS.pendingTransaction.shopItem})
-                .then(() => {
-                    return JPS.firebase.database().ref('/scbookingsbyuser/' + JPS.pendingTransaction.user + '/' + JPS.pendingTransaction.transaction.shopItemKey)
-                    .update({transactionReference: JPS.pendingTransaction.timestamp, shopItem: JPS.pendingTransaction.shopItem})
-                }).then(()=>{
-                    console.log("Updated SC-bookings succesfully");
-                    JPS.mailer.sendReceipt(JPS.pendingTransaction.receiptEmail, JPS.dataToUpdate, JPS.pendingTransaction.timestamp);
-                })
-                .catch(error => {
-                    console.error("Processing SC-bookings failed: ", pendingTransactionKey, error);
-                    throw(new Error("Processing SC-bookings failed: " + pendingTransactionKey + error.message))
-                })
-                resolve({code: 200, message: "OK"});                    
-            } else {
-                JPS.mailer.sendReceipt(JPS.pendingTransaction.receiptEmail, JPS.dataToUpdate, JPS.pendingTransaction.timestamp);
-                resolve({code: 200, message: "OK"});                    
-            }                  
-        }).catch(err => {
-            console.error("completePendingTransaction failde: ", err, JPS.pendingTransaction);
-            reject({code: 500, message: "completePendingTransaction failde: " + err, err});
-        });
 
-//Promise/////////////////////////////////////////////////
-        })
-        return promise;
+            const pendingTransaction = snapshot.val();
+            console.log("Processing pending transaction: ", pendingTransaction);
+
+            const dataToUpdate = Object.assign(
+                pendingTransaction.transaction,
+                pendingTransaction.shopItem, {
+                details: {
+                    success: true,
+                    transaction: {
+                        pendingTransaction: pendingTransactionKey,
+                        amount: pendingTransaction.shopItem.price,
+                        currencyIsoCode: "EUR",
+                        id: externalReference,
+                        paymentInstrumentType: paymentInstrumentType,
+                        paymentMethod: paymentMethod
+                    }
+                }
+            });
+
+            await JPS.firebase.database().ref('/transactions/' + pendingTransaction.user + '/' + pendingTransaction.timestamp)
+                .update(dataToUpdate);
+
+            console.log("Pending transaction processed successfully. Removing pending record.");
+            await JPS.firebase.database().ref('/pendingtransactions/' + pendingTransactionKey).remove();
+
+            console.log("Pending record removed successfully.");
+            if (pendingTransaction.shopItem.type === "special") {
+                await JPS.firebase.database().ref('/scbookingsbyslot/' + pendingTransaction.transaction.shopItemKey + '/' + pendingTransaction.user)
+                    .update({transactionReference: pendingTransaction.timestamp, shopItem: pendingTransaction.shopItem});
+
+                await JPS.firebase.database().ref('/scbookingsbyuser/' + pendingTransaction.user + '/' + pendingTransaction.transaction.shopItemKey)
+                    .update({transactionReference: pendingTransaction.timestamp, shopItem: pendingTransaction.shopItem});
+
+                console.log("Updated SC-bookings successfully");
+            }
+
+            JPS.mailer.sendReceipt(pendingTransaction.receiptEmail, dataToUpdate, pendingTransaction.timestamp);
+            return {code: 200, message: "OK"};
+
+        } catch (err) {
+            console.error("completePendingTransaction failed: ", err);
+            throw {code: 500, message: "completePendingTransaction failed: " + err, err};
+        }
     }
 }

@@ -2,7 +2,7 @@ import React from 'react'
 import { bindActionCreators } from 'redux'
 import { connect } from 'react-redux'
 import SlotForm from '../../components/admin/SlotForm.jsx'
-import { getTimeStrMsBeginnignOfDay, toHplusMfromMs } from '../../helpers/timeHelper.js'
+import { getTimeStrMsBeginnignOfDay, msToHHMM } from '../../helpers/timeHelper.js'
 import * as actionCreators from '../../actions/admin.js'
 
 
@@ -23,8 +23,8 @@ class SlotItem extends React.Component {
         this.toggleForm = false;
       }
       this.initialValues = Object.assign({},nextProps.item) 
-      this.initialValues.start = toHplusMfromMs(nextProps.item.start)
-      this.initialValues.end = toHplusMfromMs(nextProps.item.end)
+      this.initialValues.start = msToHHMM(nextProps.item.start)
+      this.initialValues.end = msToHHMM(nextProps.item.end)
   }
   
   componentWillUnmount(){

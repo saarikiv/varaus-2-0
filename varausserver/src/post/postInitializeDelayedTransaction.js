@@ -1,140 +1,119 @@
+const { validateBody } = require('../helpers/validateBody');
+
 exports.setApp = function(JPS) {
 
     //######################################################
-    // POST: 
+    // POST: initializedelayedtransaction
     //######################################################
-    JPS.app.post('/initializedelayedtransaction', (req, res) => {
+    JPS.app.post('/initializedelayedtransaction', JPS.authMiddleware, async (req, res) => {
 
-        JPS.now = Date.now();
-        console.log("initializedelayedtransaction requested.", JPS.now);
-        JPS.body = '';
-        req.on('data', (data) => {
-            JPS.body += data;
-            // Too much POST data, kill the connection!
-            // 1e6 === 1 * Math.pow(10, 6) === 1 * 1000000 ~~~ 1MB
-            if (JPS.body.length > 1e6) req.connection.destroy();
-        });
-        req.on('end', () => {
-            JPS.post = JSON.parse(JPS.body);
-            JPS.currentUserToken = JPS.post.current_user;
-            JPS.shopItemKey = JPS.post.item_key;
-            JPS.itemType = JPS.post.purchase_target;
-            console.log("POST:", JPS.post);
+        const now = Date.now();
+        console.log("initializedelayedtransaction requested.", now);
+        const post = req.body;
+        console.log("POST:", post);
 
-            JPS.firebase.auth().verifyIdToken(JPS.currentUserToken)
-                .then(decodedToken => {
-                    JPS.currentUserUID = decodedToken.uid || decodedToken.sub;
-                    console.log("User: ", JPS.currentUserUID, " requested initializedelayedtransaction.");
-                    return JPS.firebase.database().ref('/users/' + JPS.currentUserUID).once('value');
-                })
-                .then(snapshot => {
-                    if(snapshot.val() != null){
-                        JPS.user = snapshot.val()
-                        JPS.user.key = snapshot.key;
-                        switch(JPS.itemType){
-                        case "special":
-                            return JPS.firebase.database().ref('/specialSlots/' + JPS.shopItemKey).once('value');
-                        default:
-                            return JPS.firebase.database().ref('/shopItems/' + JPS.shopItemKey).once('value');
-                        }
-                    } else {
-                        throw(new Error("User was not found in the database: " + JPS.currentUserUID))
-                    }
+        const validationErrors = validateBody(post, [
+            { field: 'current_user', type: 'string' },
+            { field: 'item_key', type: 'string' },
+            { field: 'purchase_target', type: 'string' }
+        ]);
+        if (validationErrors.length > 0) {
+            return res.status(400).json({ error: validationErrors.join(', ') });
+        }
 
-                })
-                .then(snapshot => {
-                    JPS.shopItem = snapshot.val();
-                    console.log("shopitem: ",JPS.shopItem );
-                    JPS.transaction = {
-                            user: JPS.user.key,
-                            shopItem: JPS.shopItem,
-                            shopItemKey: JPS.shopItemKey,
-                            error: { code: 0 },
-                            details: "pending"
-                        }
-                        //==================================
-                        // Write the transaction to the database
-                        //==================================
-                        //calculate the expiry moment if type is count
-                    if (JPS.shopItem.type === "count") {
-                        JPS.shopItem.expires = JPS.timeHelper.shiftUntilEndOfDayMs(JPS.date.setTime(JPS.now + JPS.shopItem.expiresAfterDays * 24 * 60 * 60 * 1000));
-                        JPS.shopItem.unusedtimes = JPS.shopItem.usetimes;
-                        const newRef = JPS.firebase.database().ref('/pendingtransactions/').push();
-                        newRef.set({
-                            transaction: JPS.transaction,
-                            shopItem: JPS.shopItem,
-                            user: JPS.user.key,
-                            receiptEmail: JPS.user.email,
-                            timestamp: JPS.now
-                        }).then(() => {
-                            console.log("Pending count transaction saved: ", newRef.key);
-                            res.status(200).jsonp(newRef.key).end();
-                        }).catch(err => {
-                            console.error("COUNT push failed: ", err);
-                            throw (new Error("COUNT push failed: " + err.message));
-                        });
-                    }
-                    if (JPS.shopItem.type === "time") {
-                        console.log("time item process started.");
-                        JPS.lastTimeUserHasValidUseTime = JPS.now;
-                        JPS.firebase.database().ref('/transactions/' + JPS.user.key).once('value')
-                            .then(snapshot => {
-                                if(snapshot.val() != null){ //User has previous transactions - find the latest expiry
-                                    console.log("Processing users previous transactions to find latest expiry.");
-                                    var one;
-                                    var all = snapshot.val();
-                                    for (one in all) {
-                                        if (all[one].type === "time") {
-                                            if (all[one].expires > JPS.lastTimeUserHasValidUseTime) {
-                                                JPS.lastTimeUserHasValidUseTime = all[one].expires;
-                                                console.log("Found later expiry than now: ", JPS.lastTimeUserHasValidUseTime);
-                                            }
-                                        }
-                                    }
-                                }
-                                JPS.shopItem.expires = JPS.timeHelper.shiftUntilEndOfDayMs(JPS.date.setTime(JPS.lastTimeUserHasValidUseTime + JPS.shopItem.usedays * 24 * 60 * 60 * 1000));
-                                console.log("This new time expires: ", JPS.shopItem.expires);
-                                const newRef = JPS.firebase.database().ref('/pendingtransactions/').push();
-                                return newRef.set({
-                                    transaction: JPS.transaction,
-                                    shopItem: JPS.shopItem,
-                                    receiptEmail: JPS.user.email,
-                                    user: JPS.user.key,
-                                    timestamp: JPS.now
-                                }).then(() => {
-                                    console.log("Pending time transaction saved: ", newRef.key);
-                                    res.status(200).jsonp(newRef.key).end();
-                                });
-                            }).catch(err => {
-                                console.error("TIME push failed: ", err);
-                                throw (new Error("TIME push failed: " + err.message));
-                            });
-                    }
-                    if(JPS.shopItem.type === "special"){
-                        console.log("special slot purchase....");
-                        JPS.shopItem.expires = 0;
-                        const newRef = JPS.firebase.database().ref('/pendingtransactions/').push();
-                        newRef.set({
-                            transaction: JPS.transaction,
-                            shopItem: JPS.shopItem,
-                            user: JPS.user.key,
-                            receiptEmail: JPS.user.email,
-                            timestamp: JPS.now
-                        }).then(() => {
-                            console.log("Pending special transaction saved: ", newRef.key);
-                            res.status(200).jsonp(newRef.key).end();
-                        }).catch(err => {
-                            console.error("SPECIAL push failed: ", err);
-                            throw (new Error("SPECIAL push failed: " + err.message));
-                        });
-                    }
+        const shopItemKey = post.item_key;
+        const itemType = post.purchase_target;
 
-                }).catch(err => {
-                    console.error("Initialize delayed transaction failed: ", err);
-                    res.status(500).jsonp({
-                        message: "Initialize delayed transaction failed: " + err.toString()
-                    }).end();
+        const currentUserUID = req.auth.uid;
+        const user = req.auth.user;
+
+        console.log("User: ", currentUserUID, " requested initializedelayedtransaction.");
+
+        try {
+            let shopItemSnapshot;
+            switch(itemType){
+                case "special":
+                    shopItemSnapshot = await JPS.firebase.database().ref('/specialSlots/' + shopItemKey).once('value');
+                    break;
+                default:
+                    shopItemSnapshot = await JPS.firebase.database().ref('/shopItems/' + shopItemKey).once('value');
+            }
+
+            const shopItem = shopItemSnapshot.val();
+            console.log("shopitem: ", shopItem);
+
+            const transaction = {
+                user: user.key,
+                shopItem: shopItem,
+                shopItemKey: shopItemKey,
+                error: { code: 0 },
+                details: "pending"
+            };
+
+            if (shopItem.type === "count") {
+                const expiryMs = now + shopItem.expiresAfterDays * 24 * 60 * 60 * 1000;
+                shopItem.expires = JPS.timeHelper.shiftUntilEndOfDayMs(expiryMs);
+                shopItem.unusedtimes = shopItem.usetimes;
+                const newRef = JPS.firebase.database().ref('/pendingtransactions/').push();
+                await newRef.set({
+                    transaction: transaction,
+                    shopItem: shopItem,
+                    user: user.key,
+                    receiptEmail: user.email,
+                    timestamp: now
                 });
-            })
-        })
+                console.log("Pending count transaction saved: ", newRef.key);
+                res.status(200).json({ key: newRef.key });
+            }
+            else if (shopItem.type === "time") {
+                console.log("time item process started.");
+                let lastTimeUserHasValidUseTime = now;
+                const txSnapshot = await JPS.firebase.database().ref('/transactions/' + user.key).once('value');
+                if (txSnapshot.val() != null) {
+                    console.log("Processing users previous transactions to find latest expiry.");
+                    const all = txSnapshot.val();
+                    for (let one in all) {
+                        if (all[one].type === "time") {
+                            if (all[one].expires > lastTimeUserHasValidUseTime) {
+                                lastTimeUserHasValidUseTime = all[one].expires;
+                                console.log("Found later expiry than now: ", lastTimeUserHasValidUseTime);
+                            }
+                        }
+                    }
+                }
+                const expiryMs = lastTimeUserHasValidUseTime + shopItem.usedays * 24 * 60 * 60 * 1000;
+                shopItem.expires = JPS.timeHelper.shiftUntilEndOfDayMs(expiryMs);
+                console.log("This new time expires: ", shopItem.expires);
+                const newRef = JPS.firebase.database().ref('/pendingtransactions/').push();
+                await newRef.set({
+                    transaction: transaction,
+                    shopItem: shopItem,
+                    receiptEmail: user.email,
+                    user: user.key,
+                    timestamp: now
+                });
+                console.log("Pending time transaction saved: ", newRef.key);
+                res.status(200).json({ key: newRef.key });
+            }
+            else if (shopItem.type === "special") {
+                console.log("special slot purchase....");
+                shopItem.expires = 0;
+                const newRef = JPS.firebase.database().ref('/pendingtransactions/').push();
+                await newRef.set({
+                    transaction: transaction,
+                    shopItem: shopItem,
+                    user: user.key,
+                    receiptEmail: user.email,
+                    timestamp: now
+                });
+                console.log("Pending special transaction saved: ", newRef.key);
+                res.status(200).json({ key: newRef.key });
+            }
+        } catch (err) {
+            console.error("Initialize delayed transaction failed: ", err);
+            res.status(500).json({
+                error: "Initialize delayed transaction failed: " + err.toString()
+            });
+        }
+    })
 }

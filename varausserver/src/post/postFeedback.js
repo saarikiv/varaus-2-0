@@ -1,42 +1,41 @@
+const { validateBody } = require('../helpers/validateBody');
+
 exports.setApp = function(JPS) {
 
     //######################################################
-    // POST: cashbuy, post the item being purchased
+    // POST: feedback
     //######################################################
-    JPS.app.post('/feedback', (req, res) => {
+    JPS.app.post('/feedback', JPS.authMiddleware, async (req, res) => {
 
-        JPS.now = Date.now();
-        console.log("Feedback requested.", JPS.now);
-        JPS.body = '';
-        req.on('data', (data) => {
-            JPS.body += data;
-            // Too much POST data, kill the connection!
-            // 1e6 === 1 * Math.pow(10, 6) === 1 * 1000000 ~~~ 1MB
-            if (JPS.body.length > 1e6) req.connection.destroy();
-        });
-        req.on('end', () => {
-            JPS.post = JSON.parse(JPS.body);
-            JPS.currentUserToken = JPS.post.current_user;
-            JPS.feedbackMessage = JPS.post.feedback_message;
-            console.log("POST:", JPS.post);
+        const now = Date.now();
+        console.log("Feedback requested.", now);
+        const post = req.body;
+        console.log("POST:", post);
 
-            JPS.firebase.auth().verifyIdToken(JPS.currentUserToken)
-                .then(decodedToken => {
-                    JPS.currentUserUID = decodedToken.uid || decodedToken.sub;
-                    console.log("User: ", JPS.currentUserUID, " requested feedback.");
-                    return JPS.firebase.database().ref('/users/' + JPS.currentUserUID).once('value');
-                })
-                .then(snapshot => {
-                    JPS.user = snapshot.val()
-                    JPS.mailer.sendFeedback(JPS.user, JPS.feedbackMessage)
-                    JPS.mailer.sendThankyouForFeedback(JPS.user)
-                    res.status(200).jsonp("Feedback sent ok.").end()
-                }).catch(err => {
-                    console.error("Feedback failde: ", err);
-                    res.status(500).jsonp({
-                        message: "Feedback failde." + err.toString()
-                    }).end(err);
-                });
-        })
+        const validationErrors = validateBody(post, [
+            { field: 'current_user', type: 'string' },
+            { field: 'feedback_message', type: 'string' }
+        ]);
+        if (validationErrors.length > 0) {
+            return res.status(400).json({ error: validationErrors.join(', ') });
+        }
+
+        const feedbackMessage = post.feedback_message;
+
+        const currentUserUID = req.auth.uid;
+        const user = req.auth.user;
+
+        console.log("User: ", currentUserUID, " requested feedback.");
+
+        try {
+            JPS.mailer.sendFeedback(user, feedbackMessage)
+            JPS.mailer.sendThankyouForFeedback(user)
+            res.status(200).json({ message: "Feedback sent ok." });
+        } catch(err) {
+            console.error("Feedback failed: ", err);
+            res.status(500).json({
+                error: "Feedback failed: " + err.toString()
+            });
+        }
     })
 }

@@ -5,9 +5,20 @@
  * Command-line interface for Varaus Full-Stack Coordination System
  */
 
-import { coordinationCLI } from './index';
+// Load environment variables from .env file
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load .env from project root (three levels up from dist/cli/)
+const projectRoot = path.resolve(__dirname, '..', '..', '..');
+dotenv.config({ path: path.join(projectRoot, '.env') });
+
+import { CoordinationCLIImpl } from './index';
 import { Environment } from '../types';
 import { TestType, DeploymentTarget } from './index';
+
+// Create CLI instance with correct project root
+const coordinationCLI = new CoordinationCLIImpl(projectRoot);
 
 // Parse command line arguments
 const args = process.argv.slice(2);

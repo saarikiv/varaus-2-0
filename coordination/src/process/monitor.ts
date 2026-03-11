@@ -1,6 +1,9 @@
 /**
  * Process Monitor
- * Monitors application processes for crashes and file changes
+ * Monitors application processes for crashes and file changes.
+ * Polls process status every 5 seconds, auto-restarts on crash with
+ * configurable delay and max restart count, and watches src/ for file
+ * changes with 1000ms debounce.
  */
 
 import { ProcessManagerImpl, ProcessConfig, ChangeEvent } from './index';
@@ -51,12 +54,12 @@ export class ProcessMonitor {
     const monitored = new MonitoredApp(app, processConfig, config);
     this.monitoredApps.set(app, monitored);
 
-    // Set up crash monitoring
+    // Set up crash monitoring (polling every 5 seconds)
     if (config.autoRestart) {
       this.setupCrashMonitoring(app, monitored);
     }
 
-    // Set up file watching
+    // Set up file watching with 1000ms debounce
     if (config.watchFiles) {
       this.setupFileWatching(app, monitored);
     }
@@ -76,7 +79,7 @@ export class ProcessMonitor {
 
     const monitored = this.monitoredApps.get(app);
     if (monitored) {
-      monitored.stopMonitoring();
+      monitored.cleanup();
       this.monitoredApps.delete(app);
       console.log(`Stopped monitoring ${app}`);
     }
@@ -118,55 +121,69 @@ export class ProcessMonitor {
     }
 
     console.log(`Triggering restart of ${app}: ${reason}`);
-    await this.restartApplication(app, monitored);
+    await this.performRestart(app, monitored);
   }
 
   /**
-   * Set up crash monitoring with automatic restart
+   * Poll process status every 5 seconds.
+   * When a crash is detected (status "error" or "stopped"), schedule
+   * a delayed restart unless max restarts have been reached or a
+   * restart is already pending.
    */
   private setupCrashMonitoring(app: ApplicationName, monitored: MonitoredApp): void {
-    // Poll process status periodically
     monitored.statusCheckInterval = setInterval(() => {
       const status = this.processManager.getProcessStatus(app);
-      
+
       if (status === 'error' || status === 'stopped') {
-        // Process has crashed or stopped unexpectedly
-        if (monitored.config.autoRestart && monitored.restartCount < monitored.config.maxRestarts) {
-          console.log(`${app} crashed or stopped - attempting restart (${monitored.restartCount + 1}/${monitored.config.maxRestarts})`);
-          
-          // Delay restart to avoid rapid restart loops
-          setTimeout(() => {
-            this.restartApplication(app, monitored).catch(error => {
-              console.error(`Failed to restart ${app}:`, error);
-            });
-          }, monitored.config.restartDelay);
-        } else if (monitored.restartCount >= monitored.config.maxRestarts) {
-          console.error(`${app} has crashed ${monitored.restartCount} times - stopping automatic restarts`);
-          this.stopMonitoring(app);
+        // Check if max restarts reached
+        if (monitored.restartCount >= monitored.config.maxRestarts) {
+          if (!monitored.maxRestartsLogged) {
+            console.error(
+              `${app} has reached the maximum restart count (${monitored.config.maxRestarts}) - stopping automatic restarts`
+            );
+            monitored.maxRestartsLogged = true;
+          }
+          return;
         }
+
+        // Avoid scheduling multiple restarts while one is pending
+        if (monitored.restartPending) {
+          return;
+        }
+
+        monitored.restartPending = true;
+        console.log(
+          `${app} crashed or stopped - scheduling restart in ${monitored.config.restartDelay}ms ` +
+          `(${monitored.restartCount + 1}/${monitored.config.maxRestarts})`
+        );
+
+        monitored.restartTimeout = setTimeout(() => {
+          monitored.restartPending = false;
+          this.performRestart(app, monitored).catch(error => {
+            console.error(`Failed to restart ${app}:`, error);
+          });
+        }, monitored.config.restartDelay);
       }
-    }, 5000); // Check every 5 seconds
+    }, 5000);
   }
 
   /**
-   * Set up file watching with automatic rebuild/restart
+   * Watch the application src/ directory for file changes.
+   * Debounce changes for 1000ms before triggering a restart.
    */
   private setupFileWatching(app: ApplicationName, monitored: MonitoredApp): void {
     try {
       this.processManager.watchForChanges(app, (event: ChangeEvent) => {
-        // Debounce file changes to avoid too many restarts
         if (monitored.fileChangeTimeout) {
           clearTimeout(monitored.fileChangeTimeout);
         }
 
         monitored.fileChangeTimeout = setTimeout(() => {
-          console.log(`File changed in ${app}: ${event.path}`);
-          console.log(`Triggering rebuild and restart...`);
-          
-          this.restartApplication(app, monitored).catch(error => {
+          console.log(`File changed in ${app}: ${event.path} - triggering restart`);
+          this.performRestart(app, monitored).catch(error => {
             console.error(`Failed to restart ${app} after file change:`, error);
           });
-        }, 1000); // Wait 1 second after last change
+        }, 1000); // 1000ms debounce
       });
     } catch (error) {
       console.warn(`Could not set up file watching for ${app}:`, error);
@@ -174,14 +191,14 @@ export class ProcessMonitor {
   }
 
   /**
-   * Restart an application
+   * Restart an application and update tracking state.
    */
-  private async restartApplication(app: ApplicationName, monitored: MonitoredApp): Promise<void> {
+  private async performRestart(app: ApplicationName, monitored: MonitoredApp): Promise<void> {
     try {
       await this.processManager.restartApplication(app);
       monitored.restartCount++;
       monitored.lastRestart = new Date();
-      console.log(`${app} restarted successfully`);
+      console.log(`${app} restarted successfully (restart #${monitored.restartCount})`);
     } catch (error) {
       console.error(`Failed to restart ${app}:`, error);
       throw error;
@@ -190,8 +207,7 @@ export class ProcessMonitor {
 }
 
 /**
- * Monitored Application
- * Tracks monitoring state for a single application
+ * Tracks monitoring state for a single application.
  */
 class MonitoredApp {
   public app: ApplicationName;
@@ -201,6 +217,9 @@ class MonitoredApp {
   public lastRestart?: Date;
   public statusCheckInterval?: NodeJS.Timeout;
   public fileChangeTimeout?: NodeJS.Timeout;
+  public restartTimeout?: NodeJS.Timeout;
+  public restartPending: boolean = false;
+  public maxRestartsLogged: boolean = false;
 
   constructor(app: ApplicationName, processConfig: ProcessConfig, config: MonitorConfig) {
     this.app = app;
@@ -208,7 +227,7 @@ class MonitoredApp {
     this.config = config;
   }
 
-  stopMonitoring(): void {
+  cleanup(): void {
     if (this.statusCheckInterval) {
       clearInterval(this.statusCheckInterval);
       this.statusCheckInterval = undefined;
@@ -217,5 +236,10 @@ class MonitoredApp {
       clearTimeout(this.fileChangeTimeout);
       this.fileChangeTimeout = undefined;
     }
+    if (this.restartTimeout) {
+      clearTimeout(this.restartTimeout);
+      this.restartTimeout = undefined;
+    }
+    this.restartPending = false;
   }
 }

@@ -9,12 +9,18 @@ const JPS = {}; // The global.
 JPS.tests = require('../tests/tests.js');
 JPS.timeHelper = require('./helpers/timeHelper.js');
 JPS.errorHelper = require('./helpers/errorHelper.js');
-JPS.cancelHelper = require('./helpers/cancelHelper.js');
 JPS.pendingTransactionsHelper = require('./helpers/pendingTransactionsHelper.js');
 JPS.mailer = require('./helpers/mailer.js');
-JPS.braintree = require("braintree");
 
 console.log("ENV: ", process.env.PWD);
+
+// Validate required environment variables
+const requiredEnvVars = ['MAILGUN_API_KEY', 'MAILGUN_DOMAIN', 'MAILGUN_FROM_WHO'];
+requiredEnvVars.forEach((varName) => {
+    if (!process.env[varName]) {
+        console.warn(`WARNING: Required environment variable ${varName} is not set. Email functionality may not work.`);
+    }
+});
 
 // Firebase Admin SDK configuration
 let serviceAccount;
@@ -63,8 +69,6 @@ process.on('uncaughtException', (err) => {
     JPS.errorHelper.logErrorToFirebase(JPS, err);
 });
 
-console.log("PROCESS: ", process);
-
 // Get port primarily from Environment
 JPS.app.set('port', (process.env.PORT || JPS.listenport));
 
@@ -85,21 +89,54 @@ JPS.mailer.initializeMail(JPS);
 // HEADERS
 require('./setHeaders.js').setApp(JPS);
 
+// Body parsing middleware
+JPS.app.use(express.json({ limit: '1mb' }));
+
+// Handle malformed JSON from express.json()
+JPS.app.use((err, req, res, next) => {
+    if (err.type === 'entity.parse.failed') {
+        return res.status(400).json({ error: 'Malformed JSON in request body' });
+    }
+    if (err.type === 'entity.too.large') {
+        return res.status(413).json({ error: 'Request body too large' });
+    }
+    next(err);
+});
+// Health check endpoint (no authentication required)
+JPS.app.get('/health', (req, res) => {
+    const health = { status: 'ok' };
+
+    // Optionally verify Firebase connectivity
+    JPS.firebase.database().ref('/').once('value')
+        .then(() => {
+            health.firebase = 'connected';
+            res.status(200).json(health);
+        })
+        .catch((err) => {
+            health.firebase = 'error';
+            health.firebaseError = err.message;
+            res.status(200).json(health);
+        });
+});
+
+// Authentication middleware
+const { createAuthMiddleware } = require('./middleware/auth.js');
+const { createAdminAuthMiddleware } = require('./middleware/adminAuth.js');
+JPS.authMiddleware = createAuthMiddleware(JPS);
+JPS.adminAuthMiddleware = createAdminAuthMiddleware(JPS);
+
 // POST
 require('./post/postNotifyRegistration.js').setApp(JPS);
 require('./post/postFeedback.js').setApp(JPS);
-require('./post/postPayTrailAuthCode.js').setApp(JPS);
 require('./post/postCheckout.js').setApp(JPS);
 require('./post/postApproveIncomplete.js').setApp(JPS);
-require('./post/postCompletePaytrail.js').setApp(JPS);
-require('./post/postInitializePayTrailTransaction.js').setApp(JPS);
 require('./post/postInitializeDelayedTransaction.js').setApp(JPS);
-require('./post/postCancelPayTrailTransaction.js').setApp(JPS);
 require('./post/postCashbuy.js').setApp(JPS);
 require('./post/postCancelSlot.js').setApp(JPS);
 require('./post/postReserveSlot.js').setApp(JPS);
-require('./post/postCancelSlot.js').setApp(JPS);
 require('./post/postNotifyDelayed.js').setApp(JPS);
 require('./post/postRemoveTransaction.js').setApp(JPS);
 require('./post/postOkTransaction.js').setApp(JPS);
-require('../tests/postTest.js').setApp(JPS);
+if (process.env.NODE_ENV !== "production") {
+    require('../tests/postTest.js').setApp(JPS);
+}

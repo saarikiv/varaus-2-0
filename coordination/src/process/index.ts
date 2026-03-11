@@ -13,6 +13,7 @@ export interface ProcessManager {
   stopApplication(app: ApplicationName): Promise<void>;
   restartApplication(app: ApplicationName): Promise<void>;
   getProcessStatus(app: ApplicationName): ProcessStatus;
+  getLogEntries(app: ApplicationName): LogEntry[];
   watchForChanges(app: ApplicationName, callback: ChangeCallback): void;
 }
 
@@ -56,9 +57,9 @@ export class ProcessManagerImpl implements ProcessManager {
       throw new Error('Cannot start "both" - specify "frontend" or "backend"');
     }
 
-    // Check if process is already running
+    // Check if process is already running or starting
     const existing = this.processes.get(app);
-    if (existing && existing.status === 'running') {
+    if (existing && (existing.status === 'running' || existing.status === 'starting')) {
       throw new Error(`${app} is already running`);
     }
 
@@ -74,10 +75,10 @@ export class ProcessManagerImpl implements ProcessManager {
 
   async stopApplication(app: ApplicationName): Promise<void> {
     if (app === 'both') {
-      // Stop both applications
+      // Stop both applications concurrently; ignore errors for apps that aren't running
       await Promise.all([
-        this.stopApplication('frontend'),
-        this.stopApplication('backend')
+        this.stopSingle('frontend'),
+        this.stopSingle('backend')
       ]);
       return;
     }
@@ -87,6 +88,15 @@ export class ProcessManagerImpl implements ProcessManager {
       throw new Error(`${app} is not running`);
     }
 
+    await managedProcess.stop();
+    this.processes.delete(app);
+  }
+
+  private async stopSingle(app: ApplicationName): Promise<void> {
+    const managedProcess = this.processes.get(app);
+    if (!managedProcess) {
+      return; // Not running, nothing to stop
+    }
     await managedProcess.stop();
     this.processes.delete(app);
   }
@@ -131,13 +141,29 @@ export class ProcessManagerImpl implements ProcessManager {
 
     managedProcess.watchForChanges(callback);
   }
+
+  /**
+   * Get log entries for an application (max 1000 per app)
+   */
+  getLogEntries(app: ApplicationName): LogEntry[] {
+    if (app === 'both') {
+      throw new Error('Cannot get logs for "both" - specify "frontend" or "backend"');
+    }
+
+    const managedProcess = this.processes.get(app);
+    if (!managedProcess) {
+      return [];
+    }
+
+    return managedProcess.getLogEntries();
+  }
 }
 
 /**
  * Managed Process
  * Represents a single application process with lifecycle management
  */
-class ManagedProcess {
+export class ManagedProcess {
   private app: ApplicationName;
   public config: ProcessConfig;
   private projectRoot: string;
@@ -176,13 +202,17 @@ class ManagedProcess {
       // Capture stdout
       this.childProcess.stdout?.on('data', (data: Buffer) => {
         const message = data.toString().trim();
-        this.log('info', message);
+        if (message) {
+          this.log('info', message);
+        }
       });
 
       // Capture stderr
       this.childProcess.stderr?.on('data', (data: Buffer) => {
         const message = data.toString().trim();
-        this.log('error', message);
+        if (message) {
+          this.log('error', message);
+        }
       });
 
       // Handle process exit
@@ -265,6 +295,27 @@ class ManagedProcess {
         entries: [...this.logEntries]
       }
     };
+  }
+
+  /**
+   * Get a copy of the current log entries
+   */
+  getLogEntries(): LogEntry[] {
+    return [...this.logEntries];
+  }
+
+  /**
+   * Get the current log entry count
+   */
+  getLogCount(): number {
+    return this.logEntries.length;
+  }
+
+  /**
+   * Add a log entry (used for testing and external log injection)
+   */
+  addLogEntry(level: LogLevel, message: string): void {
+    this.log(level, message);
   }
 
   watchForChanges(callback: ChangeCallback): void {
@@ -366,6 +417,20 @@ class ManagedProcess {
     // Keep only last 1000 log entries
     if (this.logEntries.length > 1000) {
       this.logEntries.shift();
+    }
+
+    // Print to console with color coding
+    const timestamp = entry.timestamp.toISOString();
+    const prefix = `[${timestamp}] [${this.app}]`;
+    
+    if (level === 'error') {
+      console.error(`${prefix} ERROR: ${message}`);
+    } else if (level === 'warn') {
+      console.warn(`${prefix} WARN: ${message}`);
+    } else if (level === 'debug') {
+      console.log(`${prefix} DEBUG: ${message}`);
+    } else {
+      console.log(`${prefix} ${message}`);
     }
   }
 }

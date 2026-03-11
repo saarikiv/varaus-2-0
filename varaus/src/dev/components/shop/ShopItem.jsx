@@ -23,15 +23,6 @@ class ShopItem extends React.Component {
     }
   }
 
-  payTrailPurchase(){
-    const { item } = this.props
-    if(!this.onceOnly){
-      this.onceOnly = true;
-      this.props.actions.addToCart(item);
-      this.props.actions.initializePayTrailTransaction(item.key, item.type)
-      this.context.router.push('checkout');
-    }
-  }
 
   delayedPurchase(){
     const { item } = this.props

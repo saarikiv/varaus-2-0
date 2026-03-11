@@ -386,7 +386,7 @@ export class HealthMonitorImpl implements HealthMonitor {
   /**
    * Determine overall system status
    */
-  private determineOverallStatus(
+  public determineOverallStatus(
     frontendHealth: HealthStatus,
     backendHealth: HealthStatus
   ): 'healthy' | 'degraded' | 'unhealthy' {

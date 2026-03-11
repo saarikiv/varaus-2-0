@@ -101,7 +101,7 @@ echo ""
 echo "Installing frontend (varaus) dependencies..."
 if [ -d "varaus" ]; then
     cd varaus
-    npm install
+    npm install --legacy-peer-deps
     if [ $? -eq 0 ]; then
         print_success "Frontend dependencies installed"
     else

@@ -1,6 +1,6 @@
 import React from 'react'
 
-import { daysLeft } from '../../helpers/timeHelper.js'
+import { daysRemaining } from '../../helpers/timeHelper.js'
 
 export default class Tickets extends React.Component {
 
@@ -22,7 +22,7 @@ export default class Tickets extends React.Component {
 
   daysRemaining(){
     const { time } = this.props.curUsr.transactions;
-    return daysLeft(time)
+    return daysRemaining(time)
   }
 
   render() {

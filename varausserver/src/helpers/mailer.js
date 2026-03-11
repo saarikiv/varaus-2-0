@@ -3,9 +3,9 @@ JPSM.Mailgun = require('mailgun-js')
 JPSM.mg_api_key = process.env.MAILGUN_API_KEY;
 JPSM.mg_domain = process.env.MAILGUN_DOMAIN || 'sandbox75ae890e64684217a94067bbc25db626.mailgun.org';
 JPSM.mg_from_who = process.env.MAILGUN_FROM_WHO || 'postmaster@sandbox75ae890e64684217a94067bbc25db626.mailgun.org';
-JPSM.feedbackMail = process.env.FEEDBACK_ADDRESS || 'tuomo.saarikivi@outlook.com'
-JPSM.notifyMail = process.env.NOTIFY_ADDRESS || 'tuomo.saarikivi@outlook.com'
-JPSM.registrationMail = process.env.REGISTRATION_ADDRESS || 'tuomo.saarikivi@outlook.com'
+JPSM.feedbackMail = process.env.FEEDBACK_ADDRESS || null;
+JPSM.notifyMail = process.env.NOTIFY_ADDRESS || null;
+JPSM.registrationMail = process.env.REGISTRATION_ADDRESS || null;
 JPSM.initialized = false;
 
 module.exports = {
@@ -27,7 +27,7 @@ module.exports = {
         console.log("sendThankyouForFeedback")
         console.log(user)
 
-        JPSM.html =
+        const html =
             "<h1>Kiitos palautteesta!</h1>" +
             "<p>Olemme vastaanottaneet palautteesi ja arvostamme sitä, että käytit aikaasi antaaksesi palautetta.</p>" +
             "<p>Teemme kaikkemme, jotta voimme palvella Sinua paremmin tulevaisuudessa.</p>" +
@@ -35,13 +35,13 @@ module.exports = {
             "<p>Ystävällisin terveisin,</p>" +
             "<p>Hakolahdentie 2</p>"
 
-        JPSM.data = {
+        const data = {
             from: JPSM.mg_from_who,
             to: user.email,
             subject: 'Kiitos palautteesta!',
-            html: JPSM.html
+            html: html
         }
-        JPSM.mailgun.messages().send(JPSM.data, (err, body) => {
+        JPSM.mailgun.messages().send(data, (err, body) => {
             if (err) {
                 console.error("MAILGUN-error: ", err);
             } else {
@@ -53,12 +53,16 @@ module.exports = {
 
     sendNotifyDelayed: (user, transaction) => {
         if (!JPSM.initialized) return;
+        if (!JPSM.notifyMail) {
+            console.warn("NOTIFY_ADDRESS not set, skipping sendNotifyDelayed");
+            return;
+        }
 
         console.log("sendNotifyDelayed")
         console.log(user)
         console.log(transaction)
 
-        JPSM.html =
+        const html =
             "<h1>Ostoilmoitus:</h1>" +
             "<p> Hakolahdentie 2 saunavarusjärjestelmässä odottaa osto vahvistamista.</p>" +
             "<br>" +
@@ -69,15 +73,15 @@ module.exports = {
             "<p> Sähköposti: " + user.email + "</p>" 
             
 
-        console.log("Notification: ", JPSM.html)
+        console.log("Notification: ", html)
 
-        JPSM.data = {
+        const data = {
             from: JPSM.mg_from_who,
             to: JPSM.notifyMail,
             subject: 'Hakolahdentie 2 oston ilmoitus',
-            html: JPSM.html
+            html: html
         }
-        JPSM.mailgun.messages().send(JPSM.data, (err, body) => {
+        JPSM.mailgun.messages().send(data, (err, body) => {
             if (err) {
                 console.error("MAILGUN-error: ", err);
             } else {
@@ -88,25 +92,29 @@ module.exports = {
 
     sendFeedback: (user, feedback) => {
         if (!JPSM.initialized) return;
+        if (!JPSM.feedbackMail) {
+            console.warn("FEEDBACK_ADDRESS not set, skipping sendFeedback");
+            return;
+        }
 
         console.log("sendFeedback")
         console.log(user)
         console.log(feedback)
 
-        JPSM.html =
+        const html =
             "<h1>Palaute:</h1>" +
             "<p>"+ feedback +"</p>" +
             "<br>" +
             "<p> Terveisin " + user.email + "</p>"
-        console.log("Feedback: ", JPSM.html)
+        console.log("Feedback: ", html)
 
-        JPSM.data = {
+        const data = {
             from: JPSM.mg_from_who,
             to: JPSM.feedbackMail,
             subject: 'Hakolahdentie 2 varaus palaute',
-            html: JPSM.html
+            html: html
         }
-        JPSM.mailgun.messages().send(JPSM.data, (err, body) => {
+        JPSM.mailgun.messages().send(data, (err, body) => {
             if (err) {
                 console.error("MAILGUN-error: ", err);
             } else {
@@ -115,14 +123,17 @@ module.exports = {
         });
     },
 
-
     sendRegistration: (user) => {
         if (!JPSM.initialized) return;
+        if (!JPSM.registrationMail) {
+            console.warn("REGISTRATION_ADDRESS not set, skipping sendRegistration");
+            return;
+        }
 
         console.log("sendRegistration")
         console.log(user)
 
-        JPSM.html =
+        const html =
             "<h1>Rekisteröinti-ilmoitus:</h1>" +
             "<br>" +
             "<p> Käyttäjä:" + user.email + "</p>" +
@@ -130,15 +141,15 @@ module.exports = {
             "<p> Nimi:" + user.firstname + " " + user.lastname + "</p>" +
             "<br>" +
             "<p> On rekisteröitynyt Hakolahdentie 2 varaus palveluun.</p>"
-        console.log("Registration: ", JPSM.html)
+        console.log("Registration: ", html)
 
-        JPSM.data = {
+        const data = {
             from: JPSM.mg_from_who,
             to: JPSM.registrationMail,
             subject: 'Rekisteröinti imoitus',
-            html: JPSM.html
+            html: html
         }
-        JPSM.mailgun.messages().send(JPSM.data, (err, body) => {
+        JPSM.mailgun.messages().send(data, (err, body) => {
             if (err) {
                 console.error("MAILGUN-error: ", err);
             } else {
@@ -146,7 +157,6 @@ module.exports = {
             }
         });
     },
-
 
     sendConfirmation: (sendTo, slotInfo, slotTime) => {
         if (!JPSM.initialized) return;
@@ -156,7 +166,7 @@ module.exports = {
         console.log(slotInfo)
         console.log(slotTime)
 
-        JPSM.html =
+        const html =
             "<h1>Varauksen vahvistus</h1>" +
             "<p>Saunavuoron varauksesi on vahvistettu.</p>" +
             "<p>Päivä: " + JPSM.jps.timeHelper.getDayStr(slotTime) + "</p>" +
@@ -164,15 +174,15 @@ module.exports = {
             "<br></br>" +
             "<p>Mikäli et pääse saunomaan, voit perua varauksesi vielä vähintään 3 h ennen vuoron alkamista.</p>"
 
-        console.log("CONFIRMATION: ", JPSM.html)
+        console.log("CONFIRMATION: ", html)
 
-        JPSM.data = {
+        const data = {
             from: JPSM.mg_from_who,
             to: sendTo,
             subject: 'Varausvahvistus:' + slotTime.toString() + ' - Hakolahdentie 2',
-            html: JPSM.html
+            html: html
         }
-        JPSM.mailgun.messages().send(JPSM.data, (err, body) => {
+        JPSM.mailgun.messages().send(data, (err, body) => {
             if (err) {
                 console.error("MAILGUN-error: ", err);
             } else {
@@ -181,8 +191,6 @@ module.exports = {
         });
     },
 
-
-
     sendCancellationCount: (sendTo, slotInfo, slotTimeMs) => {
         if (!JPSM.initialized) return;
         var day = new Date()
@@ -190,7 +198,7 @@ module.exports = {
         console.log("sendCancellationCount")
         console.log(slotTimeMs)
 
-        JPSM.html =
+        const html =
             "<h1>Peruutuksen vahvistus</h1>" +
             "<p>Peruutuksesi on vahvistettu.</p>" +
             "<p>Päivä: " + JPSM.jps.timeHelper.getDayStr(day) + "</p>" +
@@ -199,21 +207,20 @@ module.exports = {
             "<p>Kertavarauksesi on palautettu tilillesi.</p>" +
             "<p>Tervetuloa saunomaan jonain toisena ajankohtana!</p>"
 
-        JPSM.data = {
+        const data = {
             from: JPSM.mg_from_who,
             to: sendTo,
             subject: 'Peruutusvahvistus:' + day.toString() + ' - Hakolahdentie 2',
-            html: JPSM.html
+            html: html
         }
-        JPSM.mailgun.messages().send(JPSM.data, (err, body) => {
+        JPSM.mailgun.messages().send(data, (err, body) => {
             if (err) {
-                console.error("MAILGUN-error: ", err);
+                console.error("CANCEL-SENT-error: ", err);
             } else {
                 console.log("CANCEL-SENT: ", body);
             }
         });
     },
-
 
     sendReceipt: (sendTo, trx, trxId) => {
         if (!JPSM.initialized) return;
@@ -224,7 +231,7 @@ module.exports = {
         expires.setTime(trx.expires);
         var expiresTxt = trx.expires != 0? "<p> Voimassaolo loppuu: " + JPSM.jps.timeHelper.getDayStr(expires) + "</p>" : ""
 
-        JPSM.html =
+        const html =
             "<h1>Kiitos ostostasi!</h1>" +
             "<p>Voit nyt mennä varaamaan saunavuoroja.</p>" +
             "<br></br>" +
@@ -239,13 +246,13 @@ module.exports = {
             "<br></br>" +
             "<p>Ostotunniste: " + trxId + "</p>"
 
-        JPSM.data = {
+        const data = {
             from: JPSM.mg_from_who,
             to: sendTo,
             subject: 'Ostokuitti, Hakolahdentie 2',
-            html: JPSM.html
+            html: html
         }
-        JPSM.mailgun.messages().send(JPSM.data, (err, body) => {
+        JPSM.mailgun.messages().send(data, (err, body) => {
             if (err) {
                 console.error("MAILGUN-RECEIPT-error: ", err);
             } else {

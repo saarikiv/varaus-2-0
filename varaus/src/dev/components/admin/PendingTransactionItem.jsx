@@ -30,7 +30,7 @@ class PendingTransactionItem extends React.Component {
 
   removeTransaction(item){
     if(this.confirmed2){
-      this.props.actions.cancelPaytrailPayment(item.key)
+      this.props.actions.cancelPendingTransaction(item.key)
       this.confirmed2 = false;
     } else {
       this.confirmed2 = true;

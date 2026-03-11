@@ -1,56 +1,46 @@
+const { validateBody } = require('../helpers/validateBody');
+
 exports.setApp = function(JPS) {
 
     //######################################################
-    // POST: cashbuy, post the item being purchased
+    // POST: removeTransaction
     //######################################################
-    JPS.app.post('/removeTransaction', (req, res) => {
+    JPS.app.post('/removeTransaction', JPS.authMiddleware, JPS.adminAuthMiddleware, async (req, res) => {
 
-        JPS.now = Date.now();
-        console.log("removeTransaction requested.", JPS.now);
-        JPS.body = '';
-        req.on('data', (data) => {
-            JPS.body += data;
-            // Too much POST data, kill the connection!
-            // 1e6 === 1 * Math.pow(10, 6) === 1 * 1000000 ~~~ 1MB
-            if (JPS.body.length > 1e6) req.connection.destroy();
-        });
-        req.on('end', () => {
-            JPS.post = JSON.parse(JPS.body);
-            JPS.currentUserToken = JPS.post.current_user;
-            JPS.forUserId = JPS.post.for_user;
-            JPS.transactionToRemove = JPS.post.transaction;
-            console.log("POST:", JPS.post);
+        const now = Date.now();
+        console.log("removeTransaction requested.", now);
+        const post = req.body;
+        console.log("POST:", post);
 
-            JPS.firebase.auth().verifyIdToken(JPS.currentUserToken)
-                .then(decodedToken => {
-                    JPS.currentUserUID = decodedToken.uid || decodedToken.sub;
-                    console.log("User: ", JPS.currentUserUID, " requested removeTransaction: ", JPS.forUserId + "/" + JPS.transactionToRemove.purchasetime);
-                    return JPS.firebase.database().ref('/users/' + JPS.currentUserUID).once('value');
-                })
-                .then(snapshot => {
-                    JPS.user = snapshot.val()
-                    JPS.user.key = snapshot.key;
-                    return JPS.firebase.database().ref('/specialUsers/' + JPS.currentUserUID).once('value');
-                })
-                .then(snapshot => {
-                    JPS.specialUser = snapshot.val()
-                    if (JPS.specialUser.admin) {
-                        console.log("USER requesting transaction remove is ADMIN");
-                        return JPS.firebase.database().ref('/transactions/' + JPS.forUserId + "/" + JPS.transactionToRemove.purchasetime).remove();
-                    }
-                    throw (new Error("Non admin or instructor user requesting cashbuy."))
-                })
-                .then(() => {
-                    if(JPS.transactionToRemove.type === 'special'){
-                        console.log("SPECIAL slot transation - remove bookings: ", JPS.transactionToRemove.shopItemKey, JPS.forUserId);
-                        JPS.firebase.database().ref('/scbookingsbyslot/' + JPS.transactionToRemove.shopItemKey + "/" + JPS.forUserId).remove();
-                        JPS.firebase.database().ref('/scbookingsbyuser/' + JPS.forUserId + "/" + JPS.transactionToRemove.shopItemKey).remove();
-                    }
-                    res.status(200).jsonp("Transaction removed succesfully.").end();
-                }).catch(err => {
-                    console.error("removeTransaction failde: ", err);
-                    res.status(500).jsonp("removeTransaction failde." + String(err)).end();
-                });
-        })
+        const validationErrors = validateBody(post, [
+            { field: 'current_user', type: 'string' },
+            { field: 'for_user', type: 'string' },
+            { field: 'transaction', type: 'object' },
+            { field: 'transaction.purchasetime', type: 'string' },
+            { field: 'transaction.type', type: 'string' }
+        ]);
+        if (validationErrors.length > 0) {
+            return res.status(400).json({ error: validationErrors.join(', ') });
+        }
+
+        const forUserId = post.for_user;
+        const transactionToRemove = post.transaction;
+
+        const currentUserUID = req.auth.uid;
+        console.log("User: ", currentUserUID, " requested removeTransaction: ", forUserId + "/" + transactionToRemove.purchasetime);
+        console.log("USER requesting transaction remove is ADMIN");
+
+        try {
+            await JPS.firebase.database().ref('/transactions/' + forUserId + "/" + transactionToRemove.purchasetime).remove();
+            if (transactionToRemove.type === 'special') {
+                console.log("SPECIAL slot transation - remove bookings: ", transactionToRemove.shopItemKey, forUserId);
+                await JPS.firebase.database().ref('/scbookingsbyslot/' + transactionToRemove.shopItemKey + "/" + forUserId).remove();
+                await JPS.firebase.database().ref('/scbookingsbyuser/' + forUserId + "/" + transactionToRemove.shopItemKey).remove();
+            }
+            res.status(200).json({ message: "Transaction removed successfully." });
+        } catch (err) {
+            console.error("removeTransaction failed: ", err);
+            res.status(500).json({ error: "removeTransaction failed: " + String(err) });
+        }
     })
 }

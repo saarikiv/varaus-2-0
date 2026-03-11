@@ -4,9 +4,7 @@ import { bindActionCreators } from 'redux'
 import { connect } from 'react-redux'
 
 import * as actionCreators from '../actions/shop.js'
-import SubmitPayTrail from "../components/checkout/SubmitPayTrail.jsx"
 import SubmitDelayed from "../components/checkout/SubmitDelayed.jsx"
-import PayTrail from "../components/checkout/PayTrail.jsx"
 import CashPayment from "../components/checkout/CashPayment.jsx"
 
 class Checkout extends React.Component {
@@ -14,7 +12,6 @@ class Checkout extends React.Component {
   constructor(){
     super()
     this.paymentOngoing = false;
-    this.finishingPayTrailOngoing = false;
   }
 
   componentWillReceiveProps(nextProps){
@@ -31,18 +28,6 @@ class Checkout extends React.Component {
     return(
       <SubmitDelayed actions={this.props.actions} shopItems={this.props.shopItems} />
     )    
-  }
-
-  renderSubmitPayTrail(){
-    return(
-      <SubmitPayTrail actions={this.props.actions} shopItems={this.props.shopItems} />
-    )
-  }
-
-  renderPayTrail(){
-    return (
-      <PayTrail shopItems={this.props.shopItems} actions={this.props.actions} />
-    )
   }
 
   renderDelayed(){
@@ -101,11 +86,6 @@ renderCashPayment(){
     )
   }
 
-  renderPayTrailComplete(){
-    setTimeout(() => {this.context.router.push('user')}, 200)
-    return(<div></div>)
-  }
-
   render() {
 
     switch(this.props.shopItems.phase){
@@ -113,12 +93,6 @@ renderCashPayment(){
         return this.renderDelayedTransaction()
       case "delayedPayment":
         return this.renderDelayed()
-      case "payTrailInitialized":
-        return this.renderSubmitPayTrail()
-      case "payTrailPayment":
-        return this.renderPayTrail()
-      case "payTrailComplete":
-        return this.renderPayTrailComplete()
       case "cashPayment":
         return this.renderCashPayment()
       case "done":

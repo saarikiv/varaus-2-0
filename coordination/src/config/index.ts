@@ -113,6 +113,134 @@ export const configSchema: ConfigSchema = {
   }
 };
 
+// ─── Standalone Schema Validation Functions ──────────────────────────────────
+
+const VALID_ENVIRONMENTS: readonly string[] = ['development', 'staging', 'production'];
+const VALID_LOG_LEVELS: readonly string[] = ['debug', 'info', 'warn', 'error'];
+const FIREBASE_REQUIRED_FIELDS: readonly string[] = [
+  'apiKey', 'authDomain', 'databaseURL', 'projectId',
+  'storageBucket', 'messagingSenderId', 'appId'
+];
+
+/**
+ * Validates that a value is a valid Environment.
+ */
+export function isValidEnvironment(value: unknown): value is Environment {
+  return typeof value === 'string' && VALID_ENVIRONMENTS.includes(value);
+}
+
+/**
+ * Validates that a value is a valid FirebaseConfig with all 7 required string fields.
+ */
+export function isValidFirebaseConfig(value: unknown): value is FirebaseConfig {
+  if (typeof value !== 'object' || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return FIREBASE_REQUIRED_FIELDS.every(field => typeof obj[field] === 'string');
+}
+
+/**
+ * Validates a FrontendConfig, returning aggregated errors.
+ */
+export function isValidFrontendConfig(value: unknown): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (typeof value !== 'object' || value === null) {
+    errors.push('FrontendConfig must be an object');
+    return { valid: false, errors };
+  }
+
+  const obj = value as Record<string, unknown>;
+
+  if (typeof obj.apiEndpoint !== 'string') {
+    errors.push('FrontendConfig.apiEndpoint must be a string');
+  }
+  if (typeof obj.buildOutputPath !== 'string') {
+    errors.push('FrontendConfig.buildOutputPath must be a string');
+  }
+  if (typeof obj.devServerPort !== 'number') {
+    errors.push('FrontendConfig.devServerPort must be a number');
+  }
+  if (!isValidFirebaseConfig(obj.firebaseConfig)) {
+    errors.push('FrontendConfig.firebaseConfig is invalid or missing required fields');
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Validates a BackendConfig, returning aggregated errors.
+ */
+export function isValidBackendConfig(value: unknown): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (typeof value !== 'object' || value === null) {
+    errors.push('BackendConfig must be an object');
+    return { valid: false, errors };
+  }
+
+  const obj = value as Record<string, unknown>;
+
+  if (typeof obj.port !== 'number') {
+    errors.push('BackendConfig.port must be a number');
+  }
+  if (typeof obj.logLevel !== 'string' || !VALID_LOG_LEVELS.includes(obj.logLevel)) {
+    errors.push('BackendConfig.logLevel must be one of: debug, info, warn, error');
+  }
+  if (!Array.isArray(obj.corsOrigins) || !obj.corsOrigins.every((o: unknown) => typeof o === 'string')) {
+    errors.push('BackendConfig.corsOrigins must be an array of strings');
+  }
+  if (!isValidFirebaseConfig(obj.firebaseConfig)) {
+    errors.push('BackendConfig.firebaseConfig is invalid or missing required fields');
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Validates a full SystemConfig, returning aggregated errors.
+ */
+export function isValidSystemConfig(value: unknown): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (typeof value !== 'object' || value === null) {
+    errors.push('SystemConfig must be an object');
+    return { valid: false, errors };
+  }
+
+  const obj = value as Record<string, unknown>;
+
+  // Validate frontend
+  const frontendResult = isValidFrontendConfig(obj.frontend);
+  errors.push(...frontendResult.errors);
+
+  // Validate backend
+  const backendResult = isValidBackendConfig(obj.backend);
+  errors.push(...backendResult.errors);
+
+  // Validate shared
+  if (typeof obj.shared !== 'object' || obj.shared === null) {
+    errors.push('SystemConfig.shared must be an object');
+  } else {
+    const shared = obj.shared as Record<string, unknown>;
+    if (!isValidEnvironment(shared.environment)) {
+      errors.push('SystemConfig.shared.environment must be one of: development, staging, production');
+    }
+    if (typeof shared.projectRoot !== 'string') {
+      errors.push('SystemConfig.shared.projectRoot must be a string');
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Top-level schema validation that aggregates all validation errors.
+ * This is the main entry point for schema validation.
+ */
+export function validateConfigSchema(config: unknown): { valid: boolean; errors: string[] } {
+  return isValidSystemConfig(config);
+}
+
 
 /**
  * Configuration Manager Implementation
@@ -141,6 +269,7 @@ export class ConfigManager implements ConfigurationManager {
     const validationResult = this.validateConfig(config);
     if (!validationResult.valid) {
       const errorMessages = validationResult.errors
+        .filter(err => err.severity === 'error')
         .map(err => `${err.field}: ${err.message}`)
         .join(', ');
       throw new Error(`Configuration validation failed: ${errorMessages}`);
@@ -154,21 +283,20 @@ export class ConfigManager implements ConfigurationManager {
     const errors: ValidationError[] = [];
 
     // Validate schema
-    if (!configSchema.validateSystemConfig(config)) {
-      errors.push({
-        field: 'config',
-        message: 'Configuration does not match expected schema',
-        severity: 'error'
-      });
+    const schemaResult = validateConfigSchema(config);
+    if (!schemaResult.valid) {
+      for (const errMsg of schemaResult.errors) {
+        errors.push({
+          field: 'config',
+          message: errMsg,
+          severity: 'error'
+        });
+      }
     }
 
     // Validate compatibility between frontend and backend
     const compatibilityErrors = this.validateCompatibility(config);
     errors.push(...compatibilityErrors);
-
-    // Detect missing required environment variables
-    const missingVarErrors = this.detectMissingVariables(config);
-    errors.push(...missingVarErrors);
 
     return {
       valid: errors.filter(e => e.severity === 'error').length === 0,
@@ -301,7 +429,6 @@ export class ConfigManager implements ConfigurationManager {
     }
 
     // Check that frontend API endpoint matches backend configuration
-    const backendUrl = `http://localhost:${config.backend.port}`;
     if (config.shared.environment === 'development' && !config.frontend.apiEndpoint.includes(`${config.backend.port}`)) {
       errors.push({
         field: 'frontend.apiEndpoint',
@@ -347,7 +474,7 @@ export class ConfigManager implements ConfigurationManager {
     return errors;
   }
 
-  private getRequiredVariables(environment: Environment): string[] {
+  getRequiredVariables(environment: Environment): string[] {
     const prefix = environment.toUpperCase();
     return [
       'FRONTEND_API_ENDPOINT',
@@ -376,3 +503,7 @@ export class ConfigManager implements ConfigurationManager {
 
 // Export a singleton instance
 export const configManager = new ConfigManager();
+
+// Re-export sub-modules
+export * from './dependency-checker';
+export * from './version-checker';

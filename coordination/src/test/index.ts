@@ -7,9 +7,11 @@ import { spawn } from 'child_process';
 import * as path from 'path';
 import { ApplicationName } from '../types';
 
+export type TestType = 'unit' | 'integration' | 'e2e' | 'all';
+
 export interface TestCoordinator {
-  runTests(app: ApplicationName): Promise<ApplicationTestResult>;
-  runAllTests(): Promise<TestAllResult>;
+  runTests(app: ApplicationName, testType?: TestType): Promise<ApplicationTestResult>;
+  runAllTests(testType?: TestType): Promise<TestAllResult>;
 }
 
 export interface ApplicationTestResult {
@@ -40,6 +42,10 @@ export interface TestFailureInfo {
 
 /**
  * Test Coordinator Implementation
+ *
+ * Runs frontend and backend tests in parallel, parses Mocha-format output,
+ * and reports a unified summary. Supports test type arguments (unit, integration,
+ * e2e, all) — integration and e2e fall back to unit with a warning.
  */
 export class TestCoordinatorImpl implements TestCoordinator {
   private projectRoot: string;
@@ -49,9 +55,11 @@ export class TestCoordinatorImpl implements TestCoordinator {
   }
 
   /**
-   * Run tests for a single application independently
+   * Run tests for a single application independently.
+   * Supports test type argument: unit, integration, e2e, all.
+   * Integration and e2e types fall back to unit with a warning.
    */
-  async runTests(app: ApplicationName): Promise<ApplicationTestResult> {
+  async runTests(app: ApplicationName, testType: TestType = 'all'): Promise<ApplicationTestResult> {
     if (app === 'both') {
       throw new Error('Cannot run tests for "both" - use runAllTests() instead');
     }
@@ -62,11 +70,18 @@ export class TestCoordinatorImpl implements TestCoordinator {
 
     try {
       const appDir = this.getApplicationDirectory(app);
-      
-      console.log(`Running tests for ${app}...`);
+
+      // Handle unsupported test types with fallback
+      let effectiveType = testType;
+      if (testType === 'integration' || testType === 'e2e') {
+        console.warn(`⚠ ${testType} tests not yet implemented for ${app}, falling back to unit tests`);
+        effectiveType = 'unit';
+      }
+
+      console.log(`Running ${effectiveType} tests for ${app}...`);
 
       // Execute test command
-      const testOutput = await this.executeTests(app, appDir);
+      const testOutput = await this.executeTests(app, appDir, effectiveType);
       output = testOutput;
 
       // Parse test results from output
@@ -86,7 +101,7 @@ export class TestCoordinatorImpl implements TestCoordinator {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
+
       // If test execution failed completely, return failure result
       failures.push({
         application: app,
@@ -110,19 +125,21 @@ export class TestCoordinatorImpl implements TestCoordinator {
   }
 
   /**
-   * Run tests for all applications independently
-   * Tests run in parallel since they are independent
+   * Run tests for all applications independently.
+   * Tests run in parallel since they are independent.
+   * Supports test type argument forwarded to each application.
    */
-  async runAllTests(): Promise<TestAllResult> {
+  async runAllTests(testType: TestType = 'all'): Promise<TestAllResult> {
     const startTime = Date.now();
 
     console.log('Starting coordinated test execution...');
+    console.log(`Test type: ${testType}`);
     console.log('Running tests for both applications independently...\n');
 
     // Run tests in parallel since they are independent
     const [backendResult, frontendResult] = await Promise.all([
-      this.runTests('backend'),
-      this.runTests('frontend')
+      this.runTests('backend', testType),
+      this.runTests('frontend', testType)
     ]);
 
     const success = backendResult.success && frontendResult.success;
@@ -159,17 +176,22 @@ export class TestCoordinatorImpl implements TestCoordinator {
   }
 
   /**
-   * Execute test command for an application
+   * Execute test command for an application.
+   * For 'unit' type, runs npm test. For 'all', also runs npm test (all tests).
    */
   private async executeTests(
     app: ApplicationName,
-    appDir: string
+    appDir: string,
+    testType: TestType
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       let output = '';
       let errorOutput = '';
 
-      const testProcess = spawn('npm', ['test'], {
+      // Build the test command args based on test type
+      const args = ['test'];
+
+      const testProcess = spawn('npm', args, {
         cwd: appDir,
         shell: true
       });
@@ -188,7 +210,7 @@ export class TestCoordinatorImpl implements TestCoordinator {
 
       testProcess.on('exit', (code: number | null) => {
         const fullOutput = output + errorOutput;
-        
+
         // Note: Test runners may exit with non-zero code when tests fail
         // We still want to parse the results, so we resolve with the output
         resolve(fullOutput);
@@ -201,9 +223,10 @@ export class TestCoordinatorImpl implements TestCoordinator {
   }
 
   /**
-   * Parse test results from test output
+   * Parse test results from Mocha-format test output.
+   * Extracts passing/failing/pending counts and individual failure details.
    */
-  private parseTestResults(app: ApplicationName, output: string): {
+  parseTestResults(app: ApplicationName, output: string): {
     passed: number;
     failed: number;
     skipped: number;
@@ -241,28 +264,28 @@ export class TestCoordinatorImpl implements TestCoordinator {
       const failureMatch = line.match(/^\s+\d+\)\s+(.+):/);
       if (failureMatch) {
         const testName = failureMatch[1].trim();
-        
+
         // Look ahead for error message
         let errorMessage = '';
         let stackTrace = '';
         let j = i + 1;
-        
+
         while (j < lines.length && !lines[j].match(/^\s+\d+\)/)) {
           const errorLine = lines[j];
-          
+
           if (errorLine.includes('Error:') || errorLine.includes('AssertionError:')) {
             errorMessage = errorLine.trim();
           } else if (errorLine.trim().startsWith('at ')) {
             stackTrace += errorLine + '\n';
           }
-          
+
           j++;
         }
 
         failures.push({
           application: app,
           testName,
-          testFile: 'unknown', // Would need more sophisticated parsing to extract file
+          testFile: 'unknown',
           errorMessage: errorMessage || 'Test failed',
           stackTrace: stackTrace || undefined
         });

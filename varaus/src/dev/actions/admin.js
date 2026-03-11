@@ -39,6 +39,11 @@ import {
     _showLoadingScreen
 } from './loadingScreen.js'
 
+/**
+ * Fetch the full user list and admin list from Firebase.
+ * Uses `once('value')` (no persistent listener).
+ * @returns {Function} Redux thunk action
+ */
 export function fetchUserList() {
     return dispatch => {
         _fetchUserList(dispatch)
@@ -93,6 +98,11 @@ function _fetchUserList(dispatch) {
         })
 }
 
+/**
+ * Stop listening for real-time slot list updates and clear the slot list.
+ * Calls `ref.off('value')` on `/slots/` to detach the Firebase listener.
+ * @returns {Function} Redux thunk action
+ */
 export function stopFetchSlotList() {
     return dispatch => {
         firebase.database().ref('/slots/').off('value');
@@ -105,6 +115,11 @@ export function stopFetchSlotList() {
     }
 }
 
+/**
+ * Fetch the slot list from Firebase `/slots/` with a real-time listener.
+ * Call {@link stopFetchSlotList} to detach the listener when no longer needed.
+ * @returns {Function} Redux thunk action
+ */
 export function fetchSlotList() {
     var list = []
     var returnObject = {}
@@ -134,11 +149,16 @@ export function fetchSlotList() {
             })
         }, err => {
             console.error("ERR: fetch slots: ", err);
+            _hideLoadingScreen(dispatch, "Aikojen haussa tapahtui virhe: " + err.toString(), false);
         })
     }
 }
 
-
+/**
+ * Fetch the shop item list from Firebase `/shopItems/` with a real-time listener.
+ * Call {@link stopFetchShopList} to detach the listener when no longer needed.
+ * @returns {Function} Redux thunk action
+ */
 export function fetchShopList() {
     var list = []
     return dispatch => {
@@ -168,10 +188,16 @@ export function fetchShopList() {
             })
         }, err => {
             console.error("ERR: fetch shopList: ", err);
+            _hideLoadingScreen(dispatch, "Kauppatuotteiden haussa tapahtui virhe: " + err.toString(), false);
         })
     }
 }
 
+/**
+ * Stop listening for real-time shop item list updates and clear the list.
+ * Calls `ref.off('value')` on `/shopItems/` to detach the Firebase listener.
+ * @returns {Function} Redux thunk action
+ */
 export function stopFetchShopList() {
     return dispatch => {
         firebase.database().ref('/shopItems/').off('value');
@@ -184,7 +210,11 @@ export function stopFetchShopList() {
     }
 }
 
-
+/**
+ * Fetch the terms list from Firebase `/terms/` with a real-time listener.
+ * Call {@link stopFetchTermsList} to detach the listener when no longer needed.
+ * @returns {Function} Redux thunk action
+ */
 export function fetchTermsList() {
     var list = []
 
@@ -206,10 +236,16 @@ export function fetchTermsList() {
             })
         }, err => {
             console.error("ERR: fetch terms: ", err);
+            _hideLoadingScreen(dispatch, "Ehtojen haussa tapahtui virhe: " + err.toString(), false);
         })
     }
 }
 
+/**
+ * Stop listening for real-time terms list updates and clear the list.
+ * Calls `ref.off('value')` on `/terms/` to detach the Firebase listener.
+ * @returns {Function} Redux thunk action
+ */
 export function stopFetchTermsList() {
     return dispatch => {
         firebase.database().ref('/terms/').off('value');
@@ -222,17 +258,27 @@ export function stopFetchTermsList() {
     }
 }
 
+/**
+ * Remove a terms item from Firebase `/terms/`.
+ * @param {Object} item - The terms item to remove (must have a `key` property)
+ * @returns {Function} Redux thunk action
+ */
 export function removeTermsItem(item) {
     return dispatch => {
         firebase.database().ref('/terms/' + item.key).remove().then(() => {
 
         }).catch(err => {
-            console.error("Removing terms item falied: ", err)
+            console.error("ERR: removeTermsItem: ", err);
+            _hideLoadingScreen(dispatch, "Ehdon poistossa tapahtui virhe: " + err.toString(), false);
         })
     }
 }
 
-
+/**
+ * Fetch the info item list from Firebase `/infoItems/` with a real-time listener.
+ * Call {@link stopFetchInfoList} to detach the listener when no longer needed.
+ * @returns {Function} Redux thunk action
+ */
 export function fetchInfoList() {
     var list = []
 
@@ -257,10 +303,16 @@ export function fetchInfoList() {
             })
         }, err => {
             console.error("ERR: fetch infoItems: ", err);
+            _hideLoadingScreen(dispatch, "Tietojen haussa tapahtui virhe: " + err.toString(), false);
         })
     }
 }
 
+/**
+ * Stop listening for real-time info item list updates and clear the list.
+ * Calls `ref.off('value')` on `/infoItems/` to detach the Firebase listener.
+ * @returns {Function} Redux thunk action
+ */
 export function stopFetchInfoList() {
     return dispatch => {
         firebase.database().ref('/infoItems/').off('value');
@@ -273,28 +325,43 @@ export function stopFetchInfoList() {
     }
 }
 
+/**
+ * Remove an info item from Firebase `/infoItems/`.
+ * @param {Object} item - The info item to remove (must have a `key` property)
+ * @returns {Function} Redux thunk action
+ */
 export function removeInfoItem(item) {
     return dispatch => {
         firebase.database().ref('/infoItems/' + item.key).remove().then(() => {
 
         }).catch(err => {
-            console.error("Removing info item falied: ", err)
+            console.error("ERR: removeInfoItem: ", err);
+            _hideLoadingScreen(dispatch, "Tiedon poistossa tapahtui virhe: " + err.toString(), false);
         })
     }
 }
 
-
+/**
+ * Remove a slot from Firebase `/slots/`.
+ * @param {string} key - The Firebase key of the slot to remove
+ * @returns {Function} Redux thunk action
+ */
 export function removeSlot(key) {
     return dispatch => {
         firebase.database().ref('/slots/' + key).remove().then(() => {
 
         }).catch(err => {
-            console.error("Removing slot failed: ", err)
+            console.error("ERR: removeSlot: ", err);
+            _hideLoadingScreen(dispatch, "Ajan poistossa tapahtui virhe: " + err.toString(), false);
         })
     }
 }
 
-
+/**
+ * Add a new slot to Firebase `/slots/`.
+ * @param {Object} data - Slot data with start, end, day, blocked, and reserver fields
+ * @returns {Function} Redux thunk action
+ */
 export function addSlot(data) {
 
     return dispatch => {
@@ -305,9 +372,19 @@ export function addSlot(data) {
             blocked: data.blocked || false,
             reserver: data.reserver || ""
         })
+            .catch(err => {
+                console.error("ERR: addSlot: ", err);
+                _hideLoadingScreen(dispatch, "Ajan lisäyksessä tapahtui virhe: " + err.toString(), false);
+            })
     }
 }
 
+/**
+ * Modify an existing slot in Firebase `/slots/`.
+ * @param {Object} data - Updated slot data with start, end, day, blocked, and reserver fields
+ * @param {string} key - The Firebase key of the slot to modify
+ * @returns {Function} Redux thunk action
+ */
 export function modifySlot(data, key) {
     return dispatch => {
         firebase.database().ref('/slots/' + key).update({
@@ -317,10 +394,19 @@ export function modifySlot(data, key) {
             blocked: data.blocked || false,
             reserver: data.reserver || ""
         })
+            .catch(err => {
+                console.error("ERR: modifySlot: ", err);
+                _hideLoadingScreen(dispatch, "Ajan muokkauksessa tapahtui virhe: " + err.toString(), false);
+            })
     }
 }
 
-
+/**
+ * Add a new shop item to Firebase `/shopItems/`.
+ * @param {Object} data - Shop item data with title, desc, price, taxpercent, and optional fields
+ * @param {string} type - The shop item type ('time', 'count', or 'special')
+ * @returns {Function} Redux thunk action
+ */
 export function addShopItem(data, type) {
     const beforetax = data.price / (1 + (data.taxpercent / 100))
     const taxamount = data.price - beforetax
@@ -339,10 +425,17 @@ export function addShopItem(data, type) {
         oneTime: data.oneTime || false
     })
         .catch(err => {
-            console.error("ERR: update; addShopItem: ", err);
+            console.error("ERR: addShopItem: ", err);
+            _hideLoadingScreen(dispatch, "Kauppatuotteen lisäyksessä tapahtui virhe: " + err.toString(), false);
         })
 }
 
+/**
+ * Modify an existing shop item in Firebase `/shopItems/`.
+ * @param {Object} data - Updated shop item data
+ * @param {string} type - The shop item type ('time', 'count', or 'special')
+ * @returns {Function} Redux thunk action
+ */
 export function modifyShopItem(data, type) {
     const beforetax = data.price / (1 + (data.taxpercent / 100))
     const taxamount = data.price - beforetax
@@ -361,10 +454,16 @@ export function modifyShopItem(data, type) {
         oneTime: data.oneTime || false
     })
         .catch(err => {
-            console.error("ERR: update; addShopItem: ", err);
+            console.error("ERR: modifyShopItem: ", err);
+            _hideLoadingScreen(dispatch, "Kauppatuotteen muokkauksessa tapahtui virhe: " + err.toString(), false);
         })
 }
 
+/**
+ * Add a new info item to Firebase `/infoItems/`.
+ * @param {Object} data - Info item data with title and content fields
+ * @returns {Function} Redux thunk action
+ */
 export function addInfo(data) {
     return dispatch => firebase.database().ref('/infoItems/').push({
         title: data.title,
@@ -372,9 +471,16 @@ export function addInfo(data) {
     })
         .catch(err => {
             console.error("ERR: addInfo: ", err);
+            _hideLoadingScreen(dispatch, "Tiedon lisäyksessä tapahtui virhe: " + err.toString(), false);
         })
 }
 
+/**
+ * Modify an existing info item in Firebase `/infoItems/`.
+ * @param {string} key - The Firebase key of the info item to modify
+ * @param {Object} data - Updated info item data with title and content fields
+ * @returns {Function} Redux thunk action
+ */
 export function modifyInfo(key, data) {
     return dispatch => firebase.database().ref('/infoItems/' + key).update({
         title: data.title,
@@ -382,19 +488,32 @@ export function modifyInfo(key, data) {
     })
         .catch(err => {
             console.error("ERR: modifyInfo: ", err);
+            _hideLoadingScreen(dispatch, "Tiedon muokkauksessa tapahtui virhe: " + err.toString(), false);
         })
 }
 
+/**
+ * Add a new terms item to Firebase `/terms/`.
+ * @param {Object} data - Terms item data with title and content fields
+ * @returns {Function} Redux thunk action
+ */
 export function addTerms(data) {
     return dispatch => firebase.database().ref('/terms/').push({
         title: data.title,
         content: data.content
     })
         .catch(err => {
-            console.error("ERR: addterms: ", err);
+            console.error("ERR: addTerms: ", err);
+            _hideLoadingScreen(dispatch, "Ehdon lisäyksessä tapahtui virhe: " + err.toString(), false);
         })
 }
 
+/**
+ * Modify an existing terms item in Firebase `/terms/`.
+ * @param {string} key - The Firebase key of the terms item to modify
+ * @param {Object} data - Updated terms item data with title and content fields
+ * @returns {Function} Redux thunk action
+ */
 export function modifyTerms(key, data) {
     return dispatch => firebase.database().ref('/terms/' + key).update({
         title: data.title,
@@ -402,10 +521,16 @@ export function modifyTerms(key, data) {
     })
         .catch(err => {
             console.error("ERR: modifyTerms: ", err);
+            _hideLoadingScreen(dispatch, "Ehdon muokkauksessa tapahtui virhe: " + err.toString(), false);
         })
 }
 
-
+/**
+ * Lock a user by setting `locked: true` on their `/users/` record and clearing instructor flag.
+ * Refreshes the user list after the update.
+ * @param {string} key - The Firebase UID of the user to lock
+ * @returns {Function} Redux thunk action
+ */
 export function lockUser(key) {
     return dispatch => firebase.database().ref('/users/' + key).update({
         locked: true,
@@ -415,10 +540,17 @@ export function lockUser(key) {
             _fetchUserList(dispatch)
         })
         .catch(err => {
-            console.error("ERR: update; lockUser: ", err);
+            console.error("ERR: lockUser: ", err);
+            _hideLoadingScreen(dispatch, "Käyttäjän lukitsemisessa tapahtui virhe: " + err.toString(), false);
         })
 }
 
+/**
+ * Unlock a user by removing the `locked` flag from their `/users/` record.
+ * Refreshes the user list after the update.
+ * @param {string} key - The Firebase UID of the user to unlock
+ * @returns {Function} Redux thunk action
+ */
 export function unlockUser(key) {
     return dispatch => firebase.database().ref('/users/' + key).update({
         locked: null
@@ -427,28 +559,47 @@ export function unlockUser(key) {
             _fetchUserList(dispatch)
         })
         .catch(err => {
-            console.error("ERR: update; unlockUser: ", err);
+            console.error("ERR: unlockUser: ", err);
+            _hideLoadingScreen(dispatch, "Käyttäjän avaaminen epäonnistui: " + err.toString(), false);
         })
 }
 
+/**
+ * Lock a shop item by setting `locked: true` on its `/shopItems/` record.
+ * @param {string} key - The Firebase key of the shop item to lock
+ * @returns {Function} Redux thunk action
+ */
 export function lockShopItem(key) {
     return dispatch => firebase.database().ref('/shopItems/' + key).update({
         locked: true
     })
         .catch(err => {
-            console.error("ERR: update; lockShopItem: ", err);
+            console.error("ERR: lockShopItem: ", err);
+            _hideLoadingScreen(dispatch, "Kauppatuotteen lukitsemisessa tapahtui virhe: " + err.toString(), false);
         })
 }
 
+/**
+ * Unlock a shop item by removing the `locked` flag from its `/shopItems/` record.
+ * @param {string} key - The Firebase key of the shop item to unlock
+ * @returns {Function} Redux thunk action
+ */
 export function unlockShopItem(key) {
     return dispatch => firebase.database().ref('/shopItems/' + key).update({
         locked: null
     })
         .catch(err => {
-            console.error("ERR: update; unlockShopItem: ", err);
+            console.error("ERR: unlockShopItem: ", err);
+            _hideLoadingScreen(dispatch, "Kauppatuotteen avaaminen epäonnistui: " + err.toString(), false);
         })
 }
 
+/**
+ * Grant admin privileges to a user by setting `admin: true` on their `/specialUsers/` record.
+ * Refreshes the user list after the update.
+ * @param {string} key - The Firebase UID of the user to make admin
+ * @returns {Function} Redux thunk action
+ */
 export function makeAdmin(key) {
     return dispatch => firebase.database().ref('/specialUsers/' + key).update({
         admin: true
@@ -457,10 +608,17 @@ export function makeAdmin(key) {
             _fetchUserList(dispatch)
         })
         .catch(err => {
-            console.error("ERR: update; makeAdmin: ", err);
+            console.error("ERR: makeAdmin: ", err);
+            _hideLoadingScreen(dispatch, "Admin-oikeuksien myöntämisessä tapahtui virhe: " + err.toString(), false);
         })
 }
 
+/**
+ * Revoke admin privileges from a user by removing the `admin` flag from their `/specialUsers/` record.
+ * Refreshes the user list after the update.
+ * @param {string} key - The Firebase UID of the user to remove admin from
+ * @returns {Function} Redux thunk action
+ */
 export function unmakeAdmin(key) {
     return dispatch => firebase.database().ref('/specialUsers/' + key).update({
         admin: null
@@ -469,10 +627,15 @@ export function unmakeAdmin(key) {
             _fetchUserList(dispatch)
         })
         .catch(err => {
-            console.error("ERR: update; unmakeAdmin: ", err);
+            console.error("ERR: unmakeAdmin: ", err);
+            _hideLoadingScreen(dispatch, "Admin-oikeuksien poistossa tapahtui virhe: " + err.toString(), false);
         })
 }
 
+/**
+ * Expand the admin list panel in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function expandAdminList() {
     return dispatch => {
         dispatch({
@@ -481,6 +644,10 @@ export function expandAdminList() {
     }
 }
 
+/**
+ * Minimize the admin list panel in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function minimizeAdminList() {
     return dispatch => {
         dispatch({
@@ -489,6 +656,10 @@ export function minimizeAdminList() {
     }
 }
 
+/**
+ * Expand the user list panel in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function expandUserList() {
     return dispatch => {
         dispatch({
@@ -497,6 +668,10 @@ export function expandUserList() {
     }
 }
 
+/**
+ * Minimize the user list panel in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function minimizeUserList() {
     return dispatch => {
         dispatch({
@@ -505,6 +680,10 @@ export function minimizeUserList() {
     }
 }
 
+/**
+ * Expand the slot list panel in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function expandSlotList() {
     return dispatch => {
         dispatch({
@@ -513,6 +692,10 @@ export function expandSlotList() {
     }
 }
 
+/**
+ * Minimize the slot list panel in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function minimizeSlotList() {
     return dispatch => {
         dispatch({
@@ -521,7 +704,10 @@ export function minimizeSlotList() {
     }
 }
 
-
+/**
+ * Expand the shop list panel in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function expandShopList() {
     return dispatch => {
         dispatch({
@@ -530,6 +716,10 @@ export function expandShopList() {
     }
 }
 
+/**
+ * Minimize the shop list panel in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function minimizeShopList() {
     return dispatch => {
         dispatch({
@@ -538,6 +728,11 @@ export function minimizeShopList() {
     }
 }
 
+/**
+ * Expand the slot form in the admin view.
+ * @param {string} expander - Identifier for the form expander context
+ * @returns {Function} Redux thunk action
+ */
 export function expandSlotForm(expander) {
     return dispatch => {
         dispatch({
@@ -550,6 +745,10 @@ export function expandSlotForm(expander) {
     }
 }
 
+/**
+ * Minimize the slot form in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function minimizeSlotForm() {
     return dispatch => {
         dispatch({
@@ -562,7 +761,11 @@ export function minimizeSlotForm() {
     }
 }
 
-
+/**
+ * Expand the count shop item form in the admin view.
+ * @param {string} expander - Identifier for the form expander context
+ * @returns {Function} Redux thunk action
+ */
 export function expandCountShopForm(expander) {
     return dispatch => {
         dispatch({
@@ -575,6 +778,10 @@ export function expandCountShopForm(expander) {
     }
 }
 
+/**
+ * Minimize the count shop item form in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function minimizeCountShopForm() {
     return dispatch => {
         dispatch({
@@ -587,6 +794,10 @@ export function minimizeCountShopForm() {
     }
 }
 
+/**
+ * Expand the info list panel in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function expandInfoList() {
     return dispatch => {
         dispatch({
@@ -595,6 +806,10 @@ export function expandInfoList() {
     }
 }
 
+/**
+ * Minimize the info list panel in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function minimizeInfoList() {
     return dispatch => {
         dispatch({
@@ -603,6 +818,11 @@ export function minimizeInfoList() {
     }
 }
 
+/**
+ * Expand the info form in the admin view.
+ * @param {string} expander - Identifier for the form expander context
+ * @returns {Function} Redux thunk action
+ */
 export function expandInfoForm(expander) {
     return dispatch => {
         dispatch({
@@ -615,6 +835,10 @@ export function expandInfoForm(expander) {
     }
 }
 
+/**
+ * Minimize the info form in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function minimizeInfoForm() {
     return dispatch => {
         dispatch({
@@ -627,6 +851,10 @@ export function minimizeInfoForm() {
     }
 }
 
+/**
+ * Expand the terms list panel in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function expandTermsList() {
     return dispatch => {
         dispatch({
@@ -635,6 +863,10 @@ export function expandTermsList() {
     }
 }
 
+/**
+ * Minimize the terms list panel in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function minimizeTermsList() {
     return dispatch => {
         dispatch({
@@ -643,6 +875,11 @@ export function minimizeTermsList() {
     }
 }
 
+/**
+ * Expand the terms form in the admin view.
+ * @param {string} expander - Identifier for the form expander context
+ * @returns {Function} Redux thunk action
+ */
 export function expandTermsForm(expander) {
     return dispatch => {
         dispatch({
@@ -655,6 +892,10 @@ export function expandTermsForm(expander) {
     }
 }
 
+/**
+ * Minimize the terms form in the admin view.
+ * @returns {Function} Redux thunk action
+ */
 export function minimizeTermsForm() {
     return dispatch => {
         dispatch({

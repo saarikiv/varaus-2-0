@@ -1,6 +1,6 @@
 import React from 'react'
 
-export default class SubmitPayTrail extends React.Component {
+export default class SubmitDelayed extends React.Component {
 
   constructor(){
     super();
@@ -25,7 +25,7 @@ export default class SubmitPayTrail extends React.Component {
   cancelPayment(initializedTransaction){
     if(!this.onceOnly){
       this.onceOnly = true;
-      this.props.actions.cancelPaytrailPayment(this.props.shopItems.initializedTransaction)
+      this.props.actions.cancelPendingTransaction(this.props.shopItems.initializedTransaction)
     }
   }
 

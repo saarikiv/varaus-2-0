@@ -15,7 +15,7 @@
     "start": "npm run build && node dist/cli/bin.js start",
     "start:dev": "ts-node src/cli/bin.ts start",
     "status": "npm run build && node dist/cli/bin.js status",
-    "clean": "rm -rf dist",
+    "clean": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\"",
     "coordination": "npm run build && node dist/cli/bin.js"
   },
   "devDependencies": {
@@ -30,5 +30,8 @@
   },
   "engines": {
     "node": "20.x"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1"
   }
 }

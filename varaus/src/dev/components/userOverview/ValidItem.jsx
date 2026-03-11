@@ -3,7 +3,7 @@ import { bindActionCreators } from 'redux'
 import { connect } from 'react-redux'
 
 import * as actionCreators from '../../actions/shop.js'
-import { daysLeft, getDayStrMs } from '../../helpers/timeHelper.js'
+import { daysRemaining, getDayStrMs } from '../../helpers/timeHelper.js'
 
 class ValidItem extends React.Component {
 

@@ -1,56 +1,40 @@
+const { validateBody } = require('../helpers/validateBody');
+
 exports.setApp = function(JPS) {
 
     //######################################################
-    // POST: cashbuy, post the item being purchased
+    // POST: approveincomplete
     //######################################################
-    JPS.app.post('/approveincomplete', (req, res) => {
+    JPS.app.post('/approveincomplete', JPS.authMiddleware, JPS.adminAuthMiddleware, async (req, res) => {
 
-        JPS.now = Date.now();
-        console.log("approveincomplete requested.", JPS.now);
-        JPS.body = '';
-        req.on('data', (data) => {
-            JPS.body += data;
-            // Too much POST data, kill the connection!
-            // 1e6 === 1 * Math.pow(10, 6) === 1 * 1000000 ~~~ 1MB
-            if (JPS.body.length > 1e6) req.connection.destroy();
-        });
-        req.on('end', () => {
-            JPS.post = JSON.parse(JPS.body);
-            JPS.currentUserToken = JPS.post.current_user;
-            JPS.pendingTransactionKey = JPS.post.pending_transaction_id;
-            console.log("POST:", JPS.post);
+        const now = Date.now();
+        console.log("approveincomplete requested.", now);
+        const post = req.body;
+        console.log("POST:", post);
 
-            JPS.firebase.auth().verifyIdToken(JPS.currentUserToken)
-            .then(decodedToken => {
-                JPS.currentUserUID = decodedToken.uid || decodedToken.sub;
-                console.log("User: ", JPS.currentUserUID, " requested approveincomplete for trx: ", JPS.pendingTransactionKey);
-                return JPS.firebase.database().ref('/users/' + JPS.currentUserUID).once('value');
-            })
-            .then(snapshot => {
-                JPS.user = snapshot.val()
-                JPS.user.key = snapshot.key;
-                return JPS.firebase.database().ref('/specialUsers/' + JPS.currentUserUID).once('value');
-            })
-            .then(snapshot => {
-                JPS.specialUser = snapshot.val()
-                if (JPS.specialUser.admin || JPS.specialUser.instructor) {
-                    console.log("USER requesting approveincomplete is ADMIN or INSTRUCTOR");
-                    JPS.pendingTransactionsHelper.completePendingTransaction(JPS, JPS.pendingTransactionKey, JPS.user.lastname, "Admin", null)
-                    .then( status => {
-                        console.log("Status from completing pending transaction: ", status);
-                        res.status(200).end();
-                    })
-                    .catch((error) => {
-                        console.error("Complete pending transaction request failed: ", error);
-                        throw( new Error("Complete pending transaction request failed: " + error.message))
-                    })
-                } else{
-                    throw (new Error("Non admin or instructor user requesting cashbuy."))
-                }
-            }).catch(err => {
-                console.error("approveincomplete failde: ", err);
-                res.status(500).jsonp("approveincomplete failde." + String(err)).end(err);
-            });
-        })
+        const validationErrors = validateBody(post, [
+            { field: 'current_user', type: 'string' },
+            { field: 'pending_transaction_id', type: 'string' }
+        ]);
+        if (validationErrors.length > 0) {
+            return res.status(400).json({ error: validationErrors.join(', ') });
+        }
+
+        const pendingTransactionKey = post.pending_transaction_id;
+
+        const currentUserUID = req.auth.uid;
+        const user = req.auth.user;
+
+        console.log("User: ", currentUserUID, " requested approveincomplete for trx: ", pendingTransactionKey);
+        console.log("USER requesting approveincomplete is ADMIN or INSTRUCTOR");
+
+        try {
+            const status = await JPS.pendingTransactionsHelper.completePendingTransaction(JPS, pendingTransactionKey, user.lastname, "Admin", null);
+            console.log("Status from completing pending transaction: ", status);
+            res.status(200).json({ message: "Approve incomplete completed successfully." });
+        } catch (error) {
+            console.error("Complete pending transaction request failed: ", error);
+            res.status(500).json({ error: "approveincomplete failed: " + String(new Error("Complete pending transaction request failed: " + error.message)) });
+        }
     })
 }

@@ -103,7 +103,7 @@ Write-Host "Installing frontend (varaus) dependencies..."
 if (Test-Path "varaus") {
     Push-Location varaus
     try {
-        npm install
+        npm install --legacy-peer-deps
         Print-Success "Frontend dependencies installed"
     } catch {
         Print-Error "Failed to install frontend dependencies"

@@ -1,98 +1,75 @@
+
 exports.setApp = function(JPS) {
 
     //######################################################
     // POST: cancelSlot
     //######################################################
 
-    JPS.app.post('/cancelSlot', (req, res) => {
-        JPS.now = Date.now();
-        console.log("POST: cancelSlot", JPS.now);
-        JPS.body = '';
-        req.on('data', (data) => {
-            JPS.body += data;
-            // Too much POST data, kill the connection!
-            // 1e6 === 1 * Math.pow(10, 6) === 1 * 1000000 ~~~ 1MB
-            if (JPS.body.length > 1e6) req.connection.destroy();
-        });
-        req.on('end', () => {
-            JPS.post = JSON.parse(JPS.body);
-            console.log("POST:", JPS.post);
-            JPS.currentUserToken = JPS.post.user;
-            JPS.slotInfo = JPS.post.slotInfo;
-            JPS.cancelItem = JPS.post.cancelItem;
-            JPS.txRef = JPS.post.transactionReference;
-            JPS.timezoneOffset = JPS.post.timezoneOffset;
+    JPS.app.post('/cancelSlot', async (req, res) => {
+        const now = Date.now();
+        console.log("POST: cancelSlot", now);
+        const post = req.body;
+        console.log("POST:", post);
+        const currentUserToken = post.user;
+        const slotInfo = post.slotInfo;
+        const cancelItem = post.cancelItem;
+        const txRef = post.transactionReference;
+        const timezoneOffset = post.timezoneOffset;
 
-            JPS.firebase.auth().verifyIdToken(JPS.currentUserToken)
-                .then(decodedToken => {
-                    JPS.currentUserUID = decodedToken.uid || decodedToken.sub;
-                    console.log("User: ", JPS.currentUserUID, " requested cancel slot.");
-                    return JPS.firebase.database().ref('/users/' + JPS.currentUserUID).once('value');
-                })
-                .then(snapshot => {
-                    if (snapshot.val() != null) {
-                        JPS.user = snapshot.val();
-                        JPS.user.key = snapshot.key;
-                        console.log("USER:", JPS.user);
-                        return JPS.firebase.database().ref('/bookingsbyslot/' + JPS.slotInfo.key + '/' + JPS.cancelItem + '/' + JPS.user.key).once('value');
-                    } else {
-                        throw (new Error("User record does not exist in the database: " + JPS.currentUserUID))
-                    }
-                })
-                .then(snapshot => {
-                    if (snapshot.val() == null) {
-                        throw (new Error("Booking by-SLOT does not exist in the database."))
-                    }
-                    return JPS.firebase.database().ref('/bookingsbyuser/' + JPS.user.key + '/' + JPS.slotInfo.key + '/' + JPS.cancelItem).once('value');
-                })
-                .then(snapshot => {
-                    if (snapshot.val() == null) {
-                        throw (new Error("Booking by-USER does not exist in the database."))
-                    }
-                    return JPS.firebase.database().ref('/bookingsbyuser/' + JPS.user.key + '/' + JPS.slotInfo.key + '/' + JPS.cancelItem).remove();
-                })
-                .then(() => {
-                    return JPS.firebase.database().ref('/bookingsbyslot/' + JPS.slotInfo.key + '/' + JPS.cancelItem + '/' + JPS.user.key).remove();
-                })
-                .then(() => {
-                    console.log("Transaction reference: ", JPS.txRef)
-                    if (JPS.txRef != 0) {
-                        //Give back one use time for the user
-                        JPS.firebase.database().ref('/transactions/' + JPS.user.key + '/' + JPS.txRef).once('value')
-                            .then(snapshot => {
-                                if (snapshot.val() == null) {
-                                    throw (new Error("Transaction not found in the DB: TX:" + JPS.user.key + "/" + JPS.txRef));
-                                }
-                                JPS.unusedtimes = snapshot.val().unusedtimes;
-                                JPS.unusedtimes++;
-                                return JPS.firebase.database().ref('/transactions/' + JPS.user.key + '/' + JPS.txRef).update({
-                                    unusedtimes: JPS.unusedtimes
-                                })
-                            })
-                            .then(err => {
-                                if (err) {
-                                    throw (new Error(err.message + " " + err.code));
-                                }
-                                res.status(200).jsonp({
-                                    message: "Cancellation COUNT was succesfull."
-                                }).end();
-                                JPS.mailer.sendCancellationCount(JPS.user.email, JPS.slotInfo, JPS.cancelItem); //Send confirmation email
-                            }).catch(err => {
-                                throw (new Error(err.message + " " + err.code));
-                            })
-                    } else {
-                        res.status(200).jsonp({
-                            message: "Cancellation TIME was succesfull."
-                        }).end();
-                        JPS.mailer.sendCancellationTime(JPS.user.email, JPS.slotInfo, JPS.cancelItem); //Send confirmation email
-                    }
-                })
-                .catch(err => {
-                    console.error("POST Cancel Slot failed: ", err);
-                    res.status(500).jsonp({
-                        message: "POST Cancel Slot failed:" + err.toString()
-                    }).end();
+        try {
+            const decodedToken = await JPS.firebase.auth().verifyIdToken(currentUserToken);
+            const currentUserUID = decodedToken.uid || decodedToken.sub;
+            console.log("User: ", currentUserUID, " requested cancel slot.");
+
+            const userSnapshot = await JPS.firebase.database().ref('/users/' + currentUserUID).once('value');
+            if (userSnapshot.val() == null) {
+                throw new Error("User record does not exist in the database: " + currentUserUID);
+            }
+            const user = userSnapshot.val();
+            user.key = userSnapshot.key;
+            console.log("USER:", user);
+
+            const slotSnapshot = await JPS.firebase.database().ref('/bookingsbyslot/' + slotInfo.key + '/' + cancelItem + '/' + user.key).once('value');
+            if (slotSnapshot.val() == null) {
+                throw new Error("Booking by-SLOT does not exist in the database.");
+            }
+
+            const userBookingSnapshot = await JPS.firebase.database().ref('/bookingsbyuser/' + user.key + '/' + slotInfo.key + '/' + cancelItem).once('value');
+            if (userBookingSnapshot.val() == null) {
+                throw new Error("Booking by-USER does not exist in the database.");
+            }
+
+            await JPS.firebase.database().ref('/bookingsbyuser/' + user.key + '/' + slotInfo.key + '/' + cancelItem).remove();
+            await JPS.firebase.database().ref('/bookingsbyslot/' + slotInfo.key + '/' + cancelItem + '/' + user.key).remove();
+
+            console.log("Transaction reference: ", txRef);
+            if (txRef != 0) {
+                // Give back one use time for the user
+                const txSnapshot = await JPS.firebase.database().ref('/transactions/' + user.key + '/' + txRef).once('value');
+                if (txSnapshot.val() == null) {
+                    throw new Error("Transaction not found in the DB: TX:" + user.key + "/" + txRef);
+                }
+                let unusedtimes = txSnapshot.val().unusedtimes;
+                unusedtimes++;
+                await JPS.firebase.database().ref('/transactions/' + user.key + '/' + txRef).update({
+                    unusedtimes: unusedtimes
                 });
-        })
+
+                res.status(200).json({
+                    message: "Cancellation COUNT was successful."
+                });
+                JPS.mailer.sendCancellationCount(user.email, slotInfo, cancelItem);
+            } else {
+                res.status(200).json({
+                    message: "Cancellation TIME was successful."
+                });
+                JPS.mailer.sendCancellationTime(user.email, slotInfo, cancelItem);
+            }
+        } catch (err) {
+            console.error("POST Cancel Slot failed: ", err);
+            res.status(500).json({
+                error: "POST Cancel Slot failed: " + err.toString()
+            });
+        }
     })
 }

@@ -1,6 +1,6 @@
 import React from 'react'
 
-import { daysLeft, getDayStrMs } from '../../helpers/timeHelper.js'
+import { daysRemaining, getDayStrMs } from '../../helpers/timeHelper.js'
 import ValidItem from './ValidItem.jsx'
 
 export default class UserItem extends React.Component {
@@ -17,7 +17,7 @@ export default class UserItem extends React.Component {
       return(
         <div>
           <p className="text-fade">Kertoja: {credits.count}{firstExpires}</p> 
-          <p className="text-fade">Päiviä: {daysLeft(credits.time)}</p>
+          <p className="text-fade">Päiviä: {daysRemaining(credits.time)}</p>
         </div>
       )
     }

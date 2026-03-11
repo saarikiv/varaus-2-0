@@ -17,6 +17,8 @@ import {
     _showLoadingScreen
 } from './loadingScreen.js'
 
+import { categorizeTransactions } from '../helpers/transactionHelper.js'
+
 
 const Auth = firebase.auth();
 
@@ -193,69 +195,9 @@ export function fetchUsersBookings(uid) {
 
 export function fetchUsersTransactions(uid) {
     return dispatch => {
-        var transactions = null;
         TransactionsRef = firebase.database().ref('/transactions/' + uid);
         TransactionsRef.on('value', snapshot => {
-            var trx = {
-                time: 0,
-                count: 0,
-                firstexpire: 0,
-                details: {
-                    valid: [],
-                    expired: [],
-                    oneTime: []
-                }
-            };
-            let now = Date.now();
-            let all = snapshot.val();
-            let one;
-            var trxdetails = {};
-            for (one in all) {
-                trxdetails = Object.assign({}); //Need new object to be pushed to arrays
-                trxdetails.purchasetime = one;
-                trxdetails.type = all[one].type;
-                trxdetails.expires = all[one].expires;
-                trxdetails.paymentInstrumentType = all[one].details.transaction.paymentInstrumentType;
-                trxdetails.shopItem = all[one].shopItem;
-                trxdetails.shopItemKey = all[one].shopItemKey;
-                trxdetails.oneTime = all[one].oneTime || false;
-                switch (all[one].type) {
-                    case "time":
-                        if (all[one].expires > now) {
-                            trx.time = all[one].expires;
-                        }
-                        break;
-                    case "count":
-                        trxdetails.unusedtimes = all[one].unusedtimes;
-                        trxdetails.usetimes = all[one].usetimes;
-                        if (all[one].expires > now) {
-                            trx.count += all[one].unusedtimes;
-                            if (all[one].expires < trx.firstexpire || trx.firstexpire === 0) {
-                                if (all[one].unusedtimes > 0) {
-                                    trx.firstexpire = all[one].expires;
-                                }
-                            }
-                        }
-                        break;
-                    default:
-                        console.error("undefined transaction type: ", uid, all[one].type, all[one]);
-                        break;
-                }
-                if (trxdetails.expires > now) {
-                    trx.details.valid.push(trxdetails);
-                } else {
-                    trx.details.expired.push(trxdetails);
-                }
-                if (trxdetails.oneTime) {
-                    trx.details.oneTime.push(trxdetails.shopItemKey)
-                }
-            }
-            trx.details.valid.sort((a, b) => {
-                return a.expires - b.expires
-            });
-            trx.details.expired.sort((a, b) => {
-                return a.expires - b.expires
-            });
+            const trx = categorizeTransactions(snapshot.val(), Date.now());
 
             dispatch({
                 type: UPDATE_USERS_TRANSACTIONS,

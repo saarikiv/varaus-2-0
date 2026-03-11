@@ -19,32 +19,68 @@ export interface VersionCheckResult {
   message: string;
 }
 
+/** Reasonable upper bound for major version expansion of >= ranges */
+const MAX_MAJOR_VERSION = 30;
+
 /**
- * Parses a semver range string and extracts the major version requirement
- * Supports formats like "20.x", ">=18", "^18.0.0", "18.x || 20.x"
+ * Parses a single version range part (no ||) and returns the set of major versions it satisfies.
+ * Supports: "20.x", ">=18", "^18.0.0", plain "18"
  */
-export function parseMajorVersionRequirement(versionRange: string): number[] {
-  const versions: number[] = [];
-  
-  // Handle "||" separated ranges
-  const parts = versionRange.split('||').map(p => p.trim());
-  
-  for (const part of parts) {
-    // Extract numbers from the version string
-    const match = part.match(/(\d+)/);
-    if (match) {
-      const majorVersion = parseInt(match[1], 10);
-      if (!isNaN(majorVersion) && !versions.includes(majorVersion)) {
-        versions.push(majorVersion);
-      }
+function parseSingleRange(part: string): number[] {
+  const trimmed = part.trim();
+
+  // Handle ">=" format — e.g. ">=18" means major 18 through MAX
+  const geMatch = trimmed.match(/^>=\s*(\d+)/);
+  if (geMatch) {
+    const min = parseInt(geMatch[1], 10);
+    const versions: number[] = [];
+    for (let v = min; v <= MAX_MAJOR_VERSION; v++) {
+      versions.push(v);
     }
+    return versions;
   }
-  
-  return versions.sort((a, b) => a - b);
+
+  // Handle "^" format — e.g. "^18.0.0" means only major 18
+  const caretMatch = trimmed.match(/^\^(\d+)/);
+  if (caretMatch) {
+    return [parseInt(caretMatch[1], 10)];
+  }
+
+  // Handle ".x" / ".*" format — e.g. "20.x" means only major 20
+  const dotXMatch = trimmed.match(/^(\d+)\.[x*]/i);
+  if (dotXMatch) {
+    return [parseInt(dotXMatch[1], 10)];
+  }
+
+  // Fallback: extract leading integer — e.g. "18" or "18.0.0"
+  const plainMatch = trimmed.match(/^(\d+)/);
+  if (plainMatch) {
+    return [parseInt(plainMatch[1], 10)];
+  }
+
+  return [];
 }
 
 /**
- * Checks if a Node.js version satisfies the engine requirement
+ * Parses a semver range string and extracts the set of major versions that satisfy it.
+ * Supports formats: "20.x", ">=18", "^18.0.0", "18.x || 20.x", and combinations.
+ */
+export function parseMajorVersionRequirement(versionRange: string): number[] {
+  const parts = versionRange.split('||');
+  const versionSet = new Set<number>();
+
+  for (const part of parts) {
+    for (const v of parseSingleRange(part)) {
+      versionSet.add(v);
+    }
+  }
+
+  return Array.from(versionSet).sort((a, b) => a - b);
+}
+
+/**
+ * Checks if a Node.js version satisfies the engine requirement.
+ * Returns true if the current major version is in the set parsed from the requirement.
  */
 export function checkNodeVersionCompatibility(
   currentVersion: string,
@@ -52,35 +88,18 @@ export function checkNodeVersionCompatibility(
 ): boolean {
   const currentMajor = parseInt(currentVersion.split('.')[0], 10);
   const requiredMajors = parseMajorVersionRequirement(requiredRange);
-  
+
   if (requiredMajors.length === 0) {
     // No specific requirement, assume compatible
     return true;
   }
-  
-  // Check if current major version matches any required major version
-  // Also handle "x" suffix which means any minor/patch version is acceptable
-  if (requiredRange.includes('.x') || requiredRange.includes('.*')) {
-    return requiredMajors.includes(currentMajor);
-  }
-  
-  // Handle >= operator
-  if (requiredRange.startsWith('>=')) {
-    const minVersion = requiredMajors[0];
-    return currentMajor >= minVersion;
-  }
-  
-  // Handle ^ operator (compatible with major version)
-  if (requiredRange.startsWith('^')) {
-    return requiredMajors.includes(currentMajor);
-  }
-  
-  // Default: exact major version match
+
   return requiredMajors.includes(currentMajor);
 }
 
 /**
- * Verifies Node.js version compatibility for both applications
+ * Verifies Node.js version compatibility for both applications.
+ * Returns per-application results showing whether each app is compatible.
  */
 export function verifyNodeVersionCompatibility(
   frontendPackage: PackageJson,
@@ -88,8 +107,7 @@ export function verifyNodeVersionCompatibility(
   currentNodeVersion: string
 ): VersionCheckResult[] {
   const results: VersionCheckResult[] = [];
-  
-  // Check frontend
+
   if (frontendPackage.engines?.node) {
     const compatible = checkNodeVersionCompatibility(
       currentNodeVersion,
@@ -105,8 +123,7 @@ export function verifyNodeVersionCompatibility(
         : `Node.js ${currentNodeVersion} is NOT compatible with ${frontendPackage.name} (requires ${frontendPackage.engines.node})`
     });
   }
-  
-  // Check backend
+
   if (backendPackage.engines?.node) {
     const compatible = checkNodeVersionCompatibility(
       currentNodeVersion,
@@ -122,12 +139,13 @@ export function verifyNodeVersionCompatibility(
         : `Node.js ${currentNodeVersion} is NOT compatible with ${backendPackage.name} (requires ${backendPackage.engines.node})`
     });
   }
-  
+
   return results;
 }
 
 /**
- * Checks if both applications have compatible Node.js requirements
+ * Checks if both applications have compatible Node.js requirements.
+ * Finds common satisfying major versions (intersection of parsed version sets).
  */
 export function checkApplicationsNodeCompatibility(
   frontendPackage: PackageJson,
@@ -139,7 +157,7 @@ export function checkApplicationsNodeCompatibility(
   const backendVersions = backendPackage.engines?.node
     ? parseMajorVersionRequirement(backendPackage.engines.node)
     : [];
-  
+
   // If either has no requirement, they're compatible
   if (frontendVersions.length === 0 || backendVersions.length === 0) {
     return {
@@ -148,10 +166,11 @@ export function checkApplicationsNodeCompatibility(
       message: 'Applications are compatible (one or both have no Node.js version requirement)'
     };
   }
-  
-  // Find common versions
-  const commonVersions = frontendVersions.filter(v => backendVersions.includes(v));
-  
+
+  // Find common versions (intersection)
+  const backendSet = new Set(backendVersions);
+  const commonVersions = frontendVersions.filter(v => backendSet.has(v));
+
   return {
     compatible: commonVersions.length > 0,
     commonVersions,

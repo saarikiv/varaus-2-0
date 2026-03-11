@@ -1,427 +1,281 @@
 /**
- * Property-Based Tests for Build Failure Blocking Deployment
- * Feature: full-stack-coordination, Property 5: Build Failure Blocks Deployment
- * Validates: Requirements 2.3
+ * Property-Based Tests for Build Coordination
+ * Feature: coordination, Properties 16–18
+ * Validates: Requirements 9.2, 9.4, 9.5, 9.6, 9.8
  */
 
 import { expect } from 'chai';
 import * as fc from 'fast-check';
 import { BuildCoordinatorImpl, ApplicationBuildResult } from '../../src/build';
-import { ConfigManager, SystemConfig } from '../../src/config';
-import { Environment, ApplicationName } from '../../src/types';
+import { SystemConfig } from '../../src/config';
+import { Environment, ApplicationName, LogLevel, FirebaseConfig } from '../../src/types';
 
-describe('Property 5: Build Failure Blocks Deployment', () => {
+// ─── Shared Arbitraries ──────────────────────────────────────────────────────
+
+const validEnvironments: Environment[] = ['development', 'staging', 'production'];
+const validEnvironmentArb = fc.constantFrom<Environment>(...validEnvironments);
+const validLogLevelArb = fc.constantFrom<LogLevel>('debug', 'info', 'warn', 'error');
+
+const firebaseConfigArb: fc.Arbitrary<FirebaseConfig> = fc.record({
+  apiKey: fc.string({ minLength: 1, maxLength: 30 }),
+  authDomain: fc.string({ minLength: 1, maxLength: 30 }),
+  databaseURL: fc.string({ minLength: 1, maxLength: 30 }),
+  projectId: fc.string({ minLength: 1, maxLength: 30 }),
+  storageBucket: fc.string({ minLength: 1, maxLength: 30 }),
+  messagingSenderId: fc.string({ minLength: 1, maxLength: 30 }),
+  appId: fc.string({ minLength: 1, maxLength: 30 })
+});
+
+const systemConfigArb: fc.Arbitrary<SystemConfig> = fc.record({
+  frontend: fc.record({
+    apiEndpoint: fc.string({ minLength: 1, maxLength: 50 }),
+    firebaseConfig: firebaseConfigArb,
+    buildOutputPath: fc.string({ minLength: 1, maxLength: 30 }),
+    devServerPort: fc.integer({ min: 1, max: 65535 })
+  }),
+  backend: fc.record({
+    port: fc.integer({ min: 1, max: 65535 }),
+    firebaseConfig: firebaseConfigArb,
+    corsOrigins: fc.array(fc.string({ minLength: 1, maxLength: 30 }), { minLength: 1, maxLength: 5 }),
+    logLevel: validLogLevelArb
+  }),
+  shared: fc.record({
+    environment: validEnvironmentArb,
+    projectRoot: fc.string({ minLength: 1, maxLength: 30 })
+  })
+});
+
+
+// ─── Property 16: NODE_ENV mapping from environment ──────────────────────────
+
+describe('Feature: coordination, Property 16: NODE_ENV mapping from environment', () => {
   /**
-   * For any build failure in either application, the Coordination_System should prevent 
-   * deployment and return detailed error information identifying the failing component.
+   * **Validates: Requirements 9.4, 9.5**
+   *
+   * For any build configuration, if the environment is "production" then NODE_ENV
+   * should be set to "production"; for "development" or "staging", NODE_ENV should
+   * be set to "development".
    */
-  
-  it('should prevent deployment when backend build fails', async function() {
-    this.timeout(30000); // Increase timeout for build operations
-    
+
+  it('should set NODE_ENV to "production" for production and "development" otherwise', () => {
+    fc.assert(
+      fc.property(
+        systemConfigArb,
+        fc.constantFrom<ApplicationName>('frontend', 'backend'),
+        (config, app) => {
+          const coordinator = new BuildCoordinatorImpl();
+          const env = (coordinator as any).buildEnvironment(app, config);
+
+          if (config.shared.environment === 'production') {
+            expect(env.NODE_ENV).to.equal('production');
+          } else {
+            // development or staging
+            expect(env.NODE_ENV).to.equal('development');
+          }
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('should map each specific environment correctly', () => {
+    fc.assert(
+      fc.property(
+        validEnvironmentArb,
+        firebaseConfigArb,
+        fc.integer({ min: 1, max: 65535 }),
+        fc.constantFrom<ApplicationName>('frontend', 'backend'),
+        (environment, firebase, port, app) => {
+          const config: SystemConfig = {
+            frontend: {
+              apiEndpoint: 'http://localhost:3000/api',
+              firebaseConfig: firebase,
+              buildOutputPath: 'dist',
+              devServerPort: 8080
+            },
+            backend: {
+              port,
+              firebaseConfig: firebase,
+              corsOrigins: ['http://localhost:8080'],
+              logLevel: 'info'
+            },
+            shared: {
+              environment,
+              projectRoot: '/project'
+            }
+          };
+
+          const coordinator = new BuildCoordinatorImpl();
+          const env = (coordinator as any).buildEnvironment(app, config);
+
+          const expected = environment === 'production' ? 'production' : 'development';
+          expect(env.NODE_ENV).to.equal(expected);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+});
+
+// ─── Property 17: Backend build failure blocks frontend build ────────────────
+
+describe('Feature: coordination, Property 17: Backend build failure blocks frontend build', () => {
+  /**
+   * **Validates: Requirements 9.2**
+   *
+   * For any build-all execution where the backend build fails, the frontend build
+   * result should indicate it was skipped (not executed), and the overall result
+   * should be unsuccessful.
+   */
+
+  it('should skip frontend and fail overall when backend build fails', async function () {
+    this.timeout(30000);
+
     await fc.assert(
       fc.asyncProperty(
-        fc.record({
-          environment: fc.constantFrom('development' as Environment, 'staging' as Environment, 'production' as Environment),
-          firebaseProjectId: fc.string({ minLength: 5, maxLength: 30 }),
-          firebaseDatabaseURL: fc.webUrl(),
-          apiKey: fc.string({ minLength: 20, maxLength: 50 }),
-          authDomain: fc.webUrl(),
-          storageBucket: fc.string({ minLength: 10, maxLength: 50 }),
-          messagingSenderId: fc.string({ minLength: 10, maxLength: 20 }),
-          appId: fc.string({ minLength: 20, maxLength: 50 }),
-          backendPort: fc.integer({ min: 3000, max: 9999 }),
-          errorMessage: fc.string({ minLength: 10, maxLength: 100 })
-        }),
-        async (testData) => {
-          // Set up environment variables
-          const envPrefix = testData.environment.toUpperCase();
-          process.env[`${envPrefix}_FIREBASE_API_KEY`] = testData.apiKey;
-          process.env[`${envPrefix}_FIREBASE_AUTH_DOMAIN`] = testData.authDomain;
-          process.env[`${envPrefix}_FIREBASE_DATABASE_URL`] = testData.firebaseDatabaseURL;
-          process.env[`${envPrefix}_FIREBASE_PROJECT_ID`] = testData.firebaseProjectId;
-          process.env[`${envPrefix}_FIREBASE_STORAGE_BUCKET`] = testData.storageBucket;
-          process.env[`${envPrefix}_FIREBASE_MESSAGING_SENDER_ID`] = testData.messagingSenderId;
-          process.env[`${envPrefix}_FIREBASE_APP_ID`] = testData.appId;
-          process.env.FRONTEND_API_ENDPOINT = `http://localhost:${testData.backendPort}`;
-          process.env.BACKEND_PORT = testData.backendPort.toString();
+        systemConfigArb,
+        fc.string({ minLength: 1, maxLength: 80 }),
+        async (config, errorMessage) => {
+          const coordinator = new BuildCoordinatorImpl();
+          let frontendBuildCalled = false;
 
-          const configManager = new ConfigManager();
-          const buildCoordinator = new BuildCoordinatorImpl();
-          
-          try {
-            const config = await configManager.loadConfig(testData.environment);
-            
-            // Mock buildApplication to simulate backend failure
-            const originalBuildApplication = buildCoordinator.buildApplication.bind(buildCoordinator);
-            buildCoordinator.buildApplication = async (app, cfg) => {
-              if (app === 'backend') {
-                // Simulate backend build failure
-                return {
-                  success: false,
+          // Mock buildApplication: backend always fails, track if frontend is called
+          coordinator.buildApplication = async (app: ApplicationName, cfg: SystemConfig): Promise<ApplicationBuildResult> => {
+            if (app === 'backend') {
+              return {
+                success: false,
+                application: 'backend',
+                artifacts: [],
+                duration: 10,
+                errors: [{
                   application: 'backend',
-                  artifacts: [],
-                  duration: 10,
-                  errors: [{
-                    application: 'backend',
-                    phase: 'compilation',
-                    message: testData.errorMessage
-                  }],
-                  output: `Build failed: ${testData.errorMessage}`
-                };
-              }
-              
-              // Frontend should not be built
-              return {
-                success: true,
-                application: app,
-                artifacts: [],
-                duration: 5,
-                output: 'Mock build output'
+                  phase: 'compilation',
+                  message: errorMessage
+                }],
+                output: `Build failed: ${errorMessage}`
               };
-            };
-            
-            const result = await buildCoordinator.buildAll(config);
-            
-            // Property: Build should fail overall
-            expect(result.success).to.be.false;
-            
-            // Property: Backend build should have failed
-            expect(result.backend.success).to.be.false;
-            
-            // Property: Backend errors should be present and identify the failing component
-            expect(result.backend.errors).to.exist;
-            expect(result.backend.errors!.length).to.be.greaterThan(0);
-            expect(result.backend.errors![0].application).to.equal('backend');
-            expect(result.backend.errors![0].message).to.include(testData.errorMessage);
-            
-            // Property: Frontend should not have been built successfully (skipped or failed)
-            expect(result.frontend.success).to.be.false;
-            
-            // Restore original method
-            buildCoordinator.buildApplication = originalBuildApplication;
-          } catch (error) {
-            if ((error as Error).message.includes('Missing required environment variable')) {
-              return; // Skip this test case
             }
-            throw error;
-          }
+            // If we reach here, frontend was called
+            frontendBuildCalled = true;
+            return {
+              success: true,
+              application: 'frontend',
+              artifacts: [],
+              duration: 5,
+              output: 'Should not reach here'
+            };
+          };
+
+          const result = await coordinator.buildAll(config);
+
+          // Overall result must be unsuccessful
+          expect(result.success).to.be.false;
+
+          // Backend must have failed
+          expect(result.backend.success).to.be.false;
+
+          // Frontend must not have been executed (skipped)
+          expect(frontendBuildCalled).to.be.false;
+          expect(result.frontend.success).to.be.false;
+
+          // Frontend result should indicate it was skipped
+          expect(result.frontend.errors).to.exist;
+          expect(result.frontend.errors!.length).to.be.greaterThan(0);
+          const skipMessage = result.frontend.errors![0].message.toLowerCase();
+          expect(skipMessage).to.include('skip');
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+});
+
+// ─── Property 18: Build error parser detects known error patterns ────────────
+
+describe('Feature: coordination, Property 18: Build error parser detects known error patterns', () => {
+  /**
+   * **Validates: Requirements 9.6, 9.8**
+   *
+   * For any build output string containing webpack/TypeScript error patterns,
+   * module-not-found patterns, or syntax error patterns, the parseBuildErrors
+   * function should return at least one BuildErrorInfo entry with the application
+   * name and error message.
+   */
+
+  const appArb = fc.constantFrom<ApplicationName>('frontend', 'backend');
+
+  it('should detect webpack/TypeScript error patterns (ERROR in ./file.ts:line:col)', () => {
+    fc.assert(
+      fc.property(
+        appArb,
+        fc.string({ minLength: 1, maxLength: 40 }).map(s => s.replace(/[\n\r]/g, '')),
+        fc.integer({ min: 1, max: 9999 }),
+        fc.integer({ min: 1, max: 999 }),
+        (app, fileName, line, col) => {
+          const errorLine = `ERROR in ./${fileName}.ts:${line}:${col}`;
+          const output = `Some preamble\n${errorLine}\nSome trailing text`;
+
+          const coordinator = new BuildCoordinatorImpl();
+          const errors = (coordinator as any).parseBuildErrors(app, output);
+
+          expect(errors.length).to.be.greaterThan(0);
+
+          const matchingError = errors.find(
+            (e: any) => e.application === app && e.message.includes('ERROR in')
+          );
+          expect(matchingError).to.exist;
+          expect(matchingError.application).to.equal(app);
         }
       ),
       { numRuns: 100 }
     );
   });
 
-  it('should prevent deployment when frontend build fails', async function() {
-    this.timeout(30000); // Increase timeout for build operations
-    
-    await fc.assert(
-      fc.asyncProperty(
-        fc.record({
-          environment: fc.constantFrom('development' as Environment, 'staging' as Environment, 'production' as Environment),
-          firebaseProjectId: fc.string({ minLength: 5, maxLength: 30 }),
-          firebaseDatabaseURL: fc.webUrl(),
-          apiKey: fc.string({ minLength: 20, maxLength: 50 }),
-          authDomain: fc.webUrl(),
-          storageBucket: fc.string({ minLength: 10, maxLength: 50 }),
-          messagingSenderId: fc.string({ minLength: 10, maxLength: 20 }),
-          appId: fc.string({ minLength: 20, maxLength: 50 }),
-          backendPort: fc.integer({ min: 3000, max: 9999 }),
-          errorMessage: fc.string({ minLength: 10, maxLength: 100 }),
-          errorFile: fc.string({ minLength: 5, maxLength: 50 }),
-          errorLine: fc.integer({ min: 1, max: 1000 })
-        }),
-        async (testData) => {
-          // Set up environment variables
-          const envPrefix = testData.environment.toUpperCase();
-          process.env[`${envPrefix}_FIREBASE_API_KEY`] = testData.apiKey;
-          process.env[`${envPrefix}_FIREBASE_AUTH_DOMAIN`] = testData.authDomain;
-          process.env[`${envPrefix}_FIREBASE_DATABASE_URL`] = testData.firebaseDatabaseURL;
-          process.env[`${envPrefix}_FIREBASE_PROJECT_ID`] = testData.firebaseProjectId;
-          process.env[`${envPrefix}_FIREBASE_STORAGE_BUCKET`] = testData.storageBucket;
-          process.env[`${envPrefix}_FIREBASE_MESSAGING_SENDER_ID`] = testData.messagingSenderId;
-          process.env[`${envPrefix}_FIREBASE_APP_ID`] = testData.appId;
-          process.env.FRONTEND_API_ENDPOINT = `http://localhost:${testData.backendPort}`;
-          process.env.BACKEND_PORT = testData.backendPort.toString();
+  it('should detect module-not-found patterns', () => {
+    fc.assert(
+      fc.property(
+        appArb,
+        fc.constantFrom('Module not found', 'Cannot find module'),
+        fc.string({ minLength: 1, maxLength: 40 }).map(s => s.replace(/[\n\r]/g, '')),
+        (app, pattern, moduleName) => {
+          const errorLine = `${pattern}: '${moduleName}'`;
+          const output = `Build output\n${errorLine}\nMore output`;
 
-          const configManager = new ConfigManager();
-          const buildCoordinator = new BuildCoordinatorImpl();
-          
-          try {
-            const config = await configManager.loadConfig(testData.environment);
-            
-            // Mock buildApplication to simulate frontend failure
-            const originalBuildApplication = buildCoordinator.buildApplication.bind(buildCoordinator);
-            buildCoordinator.buildApplication = async (app, cfg) => {
-              if (app === 'backend') {
-                // Backend succeeds
-                return {
-                  success: true,
-                  application: 'backend',
-                  artifacts: [],
-                  duration: 10,
-                  output: 'Backend build successful'
-                };
-              } else if (app === 'frontend') {
-                // Frontend fails
-                return {
-                  success: false,
-                  application: 'frontend',
-                  artifacts: [],
-                  duration: 15,
-                  errors: [{
-                    application: 'frontend',
-                    phase: 'compilation',
-                    message: testData.errorMessage,
-                    file: testData.errorFile,
-                    line: testData.errorLine
-                  }],
-                  output: `Build failed: ${testData.errorMessage}`
-                };
-              }
-              
-              return {
-                success: true,
-                application: app,
-                artifacts: [],
-                duration: 5,
-                output: 'Mock build output'
-              };
-            };
-            
-            const result = await buildCoordinator.buildAll(config);
-            
-            // Property: Build should fail overall
-            expect(result.success).to.be.false;
-            
-            // Property: Backend build should have succeeded
-            expect(result.backend.success).to.be.true;
-            
-            // Property: Frontend build should have failed
-            expect(result.frontend.success).to.be.false;
-            
-            // Property: Frontend errors should be present and identify the failing component
-            expect(result.frontend.errors).to.exist;
-            expect(result.frontend.errors!.length).to.be.greaterThan(0);
-            expect(result.frontend.errors![0].application).to.equal('frontend');
-            expect(result.frontend.errors![0].message).to.include(testData.errorMessage);
-            
-            // Property: Error details should include file and line information
-            if (result.frontend.errors![0].file) {
-              expect(result.frontend.errors![0].file).to.equal(testData.errorFile);
-            }
-            if (result.frontend.errors![0].line) {
-              expect(result.frontend.errors![0].line).to.equal(testData.errorLine);
-            }
-            
-            // Restore original method
-            buildCoordinator.buildApplication = originalBuildApplication;
-          } catch (error) {
-            if ((error as Error).message.includes('Missing required environment variable')) {
-              return; // Skip this test case
-            }
-            throw error;
-          }
+          const coordinator = new BuildCoordinatorImpl();
+          const errors = (coordinator as any).parseBuildErrors(app, output);
+
+          expect(errors.length).to.be.greaterThan(0);
+
+          const matchingError = errors.find(
+            (e: any) => e.application === app && e.message.includes(pattern)
+          );
+          expect(matchingError).to.exist;
+          expect(matchingError.application).to.equal(app);
         }
       ),
       { numRuns: 100 }
     );
   });
 
-  it('should provide detailed error information for any build failure', async function() {
-    this.timeout(30000); // Increase timeout for build operations
-    
-    await fc.assert(
-      fc.asyncProperty(
-        fc.record({
-          environment: fc.constantFrom('development' as Environment, 'staging' as Environment, 'production' as Environment),
-          firebaseProjectId: fc.string({ minLength: 5, maxLength: 30 }),
-          firebaseDatabaseURL: fc.webUrl(),
-          apiKey: fc.string({ minLength: 20, maxLength: 50 }),
-          authDomain: fc.webUrl(),
-          storageBucket: fc.string({ minLength: 10, maxLength: 50 }),
-          messagingSenderId: fc.string({ minLength: 10, maxLength: 20 }),
-          appId: fc.string({ minLength: 20, maxLength: 50 }),
-          backendPort: fc.integer({ min: 3000, max: 9999 }),
-          failingApp: fc.constantFrom('backend' as ApplicationName, 'frontend' as ApplicationName),
-          errorPhase: fc.constantFrom('configuration', 'compilation', 'bundling', 'asset-processing'),
-          errorMessage: fc.string({ minLength: 10, maxLength: 100 })
-        }),
-        async (testData) => {
-          // Set up environment variables
-          const envPrefix = testData.environment.toUpperCase();
-          process.env[`${envPrefix}_FIREBASE_API_KEY`] = testData.apiKey;
-          process.env[`${envPrefix}_FIREBASE_AUTH_DOMAIN`] = testData.authDomain;
-          process.env[`${envPrefix}_FIREBASE_DATABASE_URL`] = testData.firebaseDatabaseURL;
-          process.env[`${envPrefix}_FIREBASE_PROJECT_ID`] = testData.firebaseProjectId;
-          process.env[`${envPrefix}_FIREBASE_STORAGE_BUCKET`] = testData.storageBucket;
-          process.env[`${envPrefix}_FIREBASE_MESSAGING_SENDER_ID`] = testData.messagingSenderId;
-          process.env[`${envPrefix}_FIREBASE_APP_ID`] = testData.appId;
-          process.env.FRONTEND_API_ENDPOINT = `http://localhost:${testData.backendPort}`;
-          process.env.BACKEND_PORT = testData.backendPort.toString();
+  it('should detect syntax error patterns', () => {
+    fc.assert(
+      fc.property(
+        appArb,
+        fc.string({ minLength: 1, maxLength: 60 }).map(s => s.replace(/[\n\r]/g, '')),
+        (app, detail) => {
+          const errorLine = `SyntaxError: ${detail}`;
+          const output = `Compiling...\n${errorLine}\nDone`;
 
-          const configManager = new ConfigManager();
-          const buildCoordinator = new BuildCoordinatorImpl();
-          
-          try {
-            const config = await configManager.loadConfig(testData.environment);
-            
-            // Mock buildApplication to simulate failure in specified app
-            const originalBuildApplication = buildCoordinator.buildApplication.bind(buildCoordinator);
-            buildCoordinator.buildApplication = async (app, cfg) => {
-              if (app === testData.failingApp) {
-                // Simulate failure
-                return {
-                  success: false,
-                  application: app,
-                  artifacts: [],
-                  duration: 10,
-                  errors: [{
-                    application: app,
-                    phase: testData.errorPhase as any,
-                    message: testData.errorMessage
-                  }],
-                  output: `Build failed in ${testData.errorPhase}: ${testData.errorMessage}`
-                };
-              }
-              
-              // Other app succeeds (or is skipped if backend fails)
-              return {
-                success: true,
-                application: app,
-                artifacts: [],
-                duration: 5,
-                output: 'Mock build output'
-              };
-            };
-            
-            const result = await buildCoordinator.buildAll(config);
-            
-            // Property: Build should fail overall
-            expect(result.success).to.be.false;
-            
-            // Property: The failing application should be identified
-            const failedResult = testData.failingApp === 'backend' ? result.backend : result.frontend;
-            expect(failedResult.success).to.be.false;
-            
-            // Property: Error information must be detailed
-            expect(failedResult.errors).to.exist;
-            expect(failedResult.errors!.length).to.be.greaterThan(0);
-            
-            const error = failedResult.errors![0];
-            
-            // Property: Error must identify the failing application
-            expect(error.application).to.equal(testData.failingApp);
-            
-            // Property: Error must include the error message
-            expect(error.message).to.include(testData.errorMessage);
-            
-            // Property: Error must identify the phase where failure occurred
-            expect(error.phase).to.equal(testData.errorPhase);
-            
-            // Restore original method
-            buildCoordinator.buildApplication = originalBuildApplication;
-          } catch (error) {
-            if ((error as Error).message.includes('Missing required environment variable')) {
-              return; // Skip this test case
-            }
-            throw error;
-          }
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
+          const coordinator = new BuildCoordinatorImpl();
+          const errors = (coordinator as any).parseBuildErrors(app, output);
 
-  it('should not proceed with deployment when any build fails', async function() {
-    this.timeout(30000); // Increase timeout for build operations
-    
-    await fc.assert(
-      fc.asyncProperty(
-        fc.record({
-          environment: fc.constantFrom('development' as Environment, 'staging' as Environment, 'production' as Environment),
-          firebaseProjectId: fc.string({ minLength: 5, maxLength: 30 }),
-          firebaseDatabaseURL: fc.webUrl(),
-          apiKey: fc.string({ minLength: 20, maxLength: 50 }),
-          authDomain: fc.webUrl(),
-          storageBucket: fc.string({ minLength: 10, maxLength: 50 }),
-          messagingSenderId: fc.string({ minLength: 10, maxLength: 20 }),
-          appId: fc.string({ minLength: 20, maxLength: 50 }),
-          backendPort: fc.integer({ min: 3000, max: 9999 }),
-          backendFails: fc.boolean(),
-          frontendFails: fc.boolean()
-        }),
-        async (testData) => {
-          // Skip if both succeed (we're testing failure cases)
-          if (!testData.backendFails && !testData.frontendFails) {
-            return;
-          }
+          expect(errors.length).to.be.greaterThan(0);
 
-          // Set up environment variables
-          const envPrefix = testData.environment.toUpperCase();
-          process.env[`${envPrefix}_FIREBASE_API_KEY`] = testData.apiKey;
-          process.env[`${envPrefix}_FIREBASE_AUTH_DOMAIN`] = testData.authDomain;
-          process.env[`${envPrefix}_FIREBASE_DATABASE_URL`] = testData.firebaseDatabaseURL;
-          process.env[`${envPrefix}_FIREBASE_PROJECT_ID`] = testData.firebaseProjectId;
-          process.env[`${envPrefix}_FIREBASE_STORAGE_BUCKET`] = testData.storageBucket;
-          process.env[`${envPrefix}_FIREBASE_MESSAGING_SENDER_ID`] = testData.messagingSenderId;
-          process.env[`${envPrefix}_FIREBASE_APP_ID`] = testData.appId;
-          process.env.FRONTEND_API_ENDPOINT = `http://localhost:${testData.backendPort}`;
-          process.env.BACKEND_PORT = testData.backendPort.toString();
-
-          const configManager = new ConfigManager();
-          const buildCoordinator = new BuildCoordinatorImpl();
-          
-          try {
-            const config = await configManager.loadConfig(testData.environment);
-            
-            // Mock buildApplication to simulate failures
-            const originalBuildApplication = buildCoordinator.buildApplication.bind(buildCoordinator);
-            buildCoordinator.buildApplication = async (app, cfg) => {
-              const shouldFail = (app === 'backend' && testData.backendFails) || 
-                                 (app === 'frontend' && testData.frontendFails);
-              
-              if (shouldFail) {
-                return {
-                  success: false,
-                  application: app,
-                  artifacts: [],
-                  duration: 10,
-                  errors: [{
-                    application: app,
-                    phase: 'compilation',
-                    message: `${app} build failed`
-                  }],
-                  output: `${app} build failed`
-                };
-              }
-              
-              return {
-                success: true,
-                application: app,
-                artifacts: [],
-                duration: 5,
-                output: `${app} build successful`
-              };
-            };
-            
-            const result = await buildCoordinator.buildAll(config);
-            
-            // Property: If any build fails, overall result should be failure
-            expect(result.success).to.be.false;
-            
-            // Property: At least one application should have failed
-            const anyFailed = !result.backend.success || !result.frontend.success;
-            expect(anyFailed).to.be.true;
-            
-            // Restore original method
-            buildCoordinator.buildApplication = originalBuildApplication;
-          } catch (error) {
-            if ((error as Error).message.includes('Missing required environment variable')) {
-              return; // Skip this test case
-            }
-            throw error;
-          }
+          const matchingError = errors.find(
+            (e: any) => e.application === app && e.message.includes('SyntaxError')
+          );
+          expect(matchingError).to.exist;
+          expect(matchingError.application).to.equal(app);
         }
       ),
       { numRuns: 100 }
