@@ -37,10 +37,18 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.HealthMonitorImpl = void 0;
+exports.HealthMonitorImpl = exports.MONITORED_BACKEND_ROUTES = void 0;
 exports.createHealthMonitor = createHealthMonitor;
 const http = __importStar(require("http"));
 const https = __importStar(require("https"));
+/**
+ * Registry of known backend routes monitored by the health check system.
+ * Each route represents an API endpoint that should be reachable when the backend is healthy.
+ */
+exports.MONITORED_BACKEND_ROUTES = [
+    '/health',
+    '/deleteProfile',
+];
 /**
  * Health Monitor Implementation
  */

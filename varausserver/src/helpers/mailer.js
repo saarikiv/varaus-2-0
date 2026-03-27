@@ -222,6 +222,43 @@ module.exports = {
         });
     },
 
+    sendDeletionConfirmation: (email, deletionDate) => {
+        if (!JPSM.initialized) return;
+
+        console.log("sendDeletionConfirmation")
+        console.log(email)
+
+        const dateStr = deletionDate instanceof Date
+            ? deletionDate.toLocaleDateString('fi-FI')
+            : String(deletionDate);
+
+        const html =
+            "<h1>Profiilin poistovahvistus</h1>" +
+            "<p>Profiilisi on poistettu Hakolahdentie 2 varausjärjestelmästä.</p>" +
+            "<br>" +
+            "<p>Sähköposti: " + email + "</p>" +
+            "<p>Poistopäivä: " + dateStr + "</p>" +
+            "<br>" +
+            "<p>Jos et pyytänyt tätä toimenpidettä, ota yhteyttä ylläpitoon.</p>" +
+            "<br>" +
+            "<p>Ystävällisin terveisin,</p>" +
+            "<p>Hakolahdentie 2</p>"
+
+        const data = {
+            from: JPSM.mg_from_who,
+            to: email,
+            subject: 'Profiilin poistovahvistus - Hakolahdentie 2',
+            html: html
+        }
+        JPSM.mailgun.messages().send(data, (err, body) => {
+            if (err) {
+                console.error("MAILGUN-DELETION-error: ", err);
+            } else {
+                console.log("DELETION-CONFIRMATION-SENT: ", body);
+            }
+        });
+    },
+
     sendReceipt: (sendTo, trx, trxId) => {
         if (!JPSM.initialized) return;
 

@@ -1,7 +1,10 @@
 "use strict";
 /**
  * Logging Module
- * Provides unified logging with correlation IDs for tracing requests across applications
+ * Provides unified logging with correlation IDs for tracing requests across applications.
+ *
+ * All backend endpoints (including POST /deleteProfile) are captured automatically
+ * via correlation IDs — no endpoint-specific logging configuration is required.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;

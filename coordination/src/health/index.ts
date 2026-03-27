@@ -49,6 +49,15 @@ export interface HealthCheckEndpoint {
 }
 
 /**
+ * Registry of known backend routes monitored by the health check system.
+ * Each route represents an API endpoint that should be reachable when the backend is healthy.
+ */
+export const MONITORED_BACKEND_ROUTES: readonly string[] = [
+  '/health',
+  '/deleteProfile',
+];
+
+/**
  * Health Monitor Implementation
  */
 export class HealthMonitorImpl implements HealthMonitor {

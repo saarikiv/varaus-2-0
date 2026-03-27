@@ -39,6 +39,11 @@ export interface HealthCheckEndpoint {
     timeout?: number;
 }
 /**
+ * Registry of known backend routes monitored by the health check system.
+ * Each route represents an API endpoint that should be reachable when the backend is healthy.
+ */
+export declare const MONITORED_BACKEND_ROUTES: readonly string[];
+/**
  * Health Monitor Implementation
  */
 export declare class HealthMonitorImpl implements HealthMonitor {

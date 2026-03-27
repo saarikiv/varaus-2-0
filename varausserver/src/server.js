@@ -137,6 +137,7 @@ require('./post/postReserveSlot.js').setApp(JPS);
 require('./post/postNotifyDelayed.js').setApp(JPS);
 require('./post/postRemoveTransaction.js').setApp(JPS);
 require('./post/postOkTransaction.js').setApp(JPS);
+require('./post/postDeleteProfile.js').setApp(JPS);
 if (process.env.NODE_ENV !== "production") {
     require('../tests/postTest.js').setApp(JPS);
 }

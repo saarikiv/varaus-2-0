@@ -1,6 +1,9 @@
 /**
  * Logging Module
- * Provides unified logging with correlation IDs for tracing requests across applications
+ * Provides unified logging with correlation IDs for tracing requests across applications.
+ *
+ * All backend endpoints (including POST /deleteProfile) are captured automatically
+ * via correlation IDs — no endpoint-specific logging configuration is required.
  */
 import { ApplicationName, LogEntry } from '../types';
 export interface Logger {

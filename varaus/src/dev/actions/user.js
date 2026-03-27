@@ -9,7 +9,12 @@ import {
     SEND_FEEDBABCK,
     VERIFY_EMAIL,
     PASSWORD_RESET,
-    UPDATE_USER_DETAILS
+    UPDATE_USER_DETAILS,
+    DELETE_PROFILE_REQUEST,
+    DELETE_PROFILE_SUCCESS,
+    DELETE_PROFILE_FAILURE,
+    ACTIVE_BOOKINGS_CHECKED,
+    SIGN_OUT
 } from './actionTypes.js'
 
 import {
@@ -354,4 +359,108 @@ export function createNewUser(user, firstname, lastname, alias) {
             })
         }
     })
+}
+
+export function deleteProfile() {
+    return dispatch => {
+        _showLoadingScreen(dispatch, "Poistetaan profiilia")
+        dispatch({ type: DELETE_PROFILE_REQUEST })
+
+        const currentUser = firebase.auth().currentUser;
+        if (!currentUser) {
+            _hideLoadingScreen(dispatch, "Virhe: Et ole kirjautunut sisään", false)
+            dispatch({
+                type: DELETE_PROFILE_FAILURE,
+                payload: {
+                    error: {
+                        code: "auth/no-user",
+                        message: "Et ole kirjautunut sisään"
+                    }
+                }
+            })
+            return;
+        }
+
+        let VARAUSURL = typeof(VARAUSSERVER) === "undefined" ? 'http://localhost:3000/deleteProfile' : VARAUSSERVER + '/deleteProfile'
+        currentUser.getToken(true)
+            .then(idToken => {
+                return axios.post(VARAUSURL, {
+                    current_user: idToken
+                })
+            })
+            .then(response => {
+                dispatch({ type: DELETE_PROFILE_SUCCESS })
+                _hideLoadingScreen(dispatch, "Profiili poistettu", true)
+                firebase.auth().signOut().then(() => {
+                    dispatch({ type: SIGN_OUT })
+                })
+            })
+            .catch(error => {
+                console.error("DELETE_PROFILE_ERROR:", error);
+                if (error.response && error.response.status === 409) {
+                    _hideLoadingScreen(dispatch, "Sinulla on aktiivisia varauksia. Peru varaukset ennen profiilin poistoa.", false)
+                    dispatch({
+                        type: DELETE_PROFILE_FAILURE,
+                        payload: {
+                            error: {
+                                code: "ACTIVE_BOOKINGS",
+                                message: "Sinulla on aktiivisia varauksia. Peru varaukset ennen profiilin poistoa."
+                            }
+                        }
+                    })
+                } else {
+                    _hideLoadingScreen(dispatch, "Profiilin poistamisessa tapahtui virhe: " + error.toString(), false)
+                    dispatch({
+                        type: DELETE_PROFILE_FAILURE,
+                        payload: {
+                            error: {
+                                code: "DELETE_PROFILE_ERROR",
+                                message: error.response ? error.response.data.error : error.toString()
+                            }
+                        }
+                    })
+                }
+            })
+    }
+}
+
+export function checkActiveBookings(uid) {
+    return dispatch => {
+        firebase.database().ref('/slots/').once('value')
+            .then(slotsSnapshot => {
+                const slotInfo = slotsSnapshot.val() || {};
+                return firebase.database().ref('/bookingsbyuser/' + uid).once('value')
+                    .then(bookingsSnapshot => {
+                        const allSlots = bookingsSnapshot.val();
+                        let hasActive = false;
+                        if (allSlots) {
+                            for (let oneSlot in allSlots) {
+                                const allBookings = allSlots[oneSlot];
+                                const info = slotInfo[oneSlot];
+                                if (!info) continue;
+                                for (let oneBooking in allBookings) {
+                                    const booking = allBookings[oneBooking];
+                                    const referenceTime = booking.slotTime + info.end - info.start;
+                                    if (referenceTime > Date.now()) {
+                                        hasActive = true;
+                                        break;
+                                    }
+                                }
+                                if (hasActive) break;
+                            }
+                        }
+                        dispatch({
+                            type: ACTIVE_BOOKINGS_CHECKED,
+                            payload: hasActive
+                        })
+                    })
+            })
+            .catch(error => {
+                console.error("CHECK_ACTIVE_BOOKINGS_ERROR:", error);
+                dispatch({
+                    type: ACTIVE_BOOKINGS_CHECKED,
+                    payload: false
+                })
+            })
+    }
 }
